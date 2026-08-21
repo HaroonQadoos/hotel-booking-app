@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Auth Flow Diagram</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Serif:wght@600&display=swap">
+<style>
+  /* Committed to a single light look on purpose: this page exists to be
+     exported as a PNG, so the rendering must be deterministic. */
+  :root {
+    --paper:     #EFF2F5;
+    --surface:   #FFFFFF;
+    --surface-2: #F7F9FB;
+    --ink:       #131C26;
+    --ink-soft:  #54636F;
+    --rule:      #D2D9E0;
+    --rust:      #A62F1E;
+    --rust-wash: #FAEDEA;
+    --pine:      #1C6B58;
+    --pine-wash: #E5F3EF;
+    --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+    --serif: "IBM Plex Serif", Georgia, serif;
+  }
+  body {
+    background: var(--paper); color: var(--ink);
+    margin: 0; padding: 36px 24px 48px;
+    font-family: var(--mono);
+    -webkit-font-smoothing: antialiased;
+  }
+  .sheet {
+    max-width: 1040px; margin: 0 auto; background: var(--surface);
+    border: 1px solid var(--rule); padding: 28px 20px 32px;
+  }
+  h1 {
+    font-family: var(--serif); font-weight: 600; font-size: 27px;
+    margin: 0 0 4px; text-align: center; color: var(--ink);
+  }
+  .sub {
+    text-align: center; font-size: 12px; color: var(--ink-soft);
+    letter-spacing: .1em; margin: 0 0 26px;
+  }
+  svg { display: block; width: 100%; height: auto; }
+
+  .b     { fill: var(--surface-2); stroke: var(--rule); stroke-width: 1.2; }
+  .b-key { fill: var(--pine-wash); stroke: var(--pine); stroke-width: 2; }
+  .b-ok  { fill: var(--pine-wash); stroke: var(--pine); stroke-width: 1.4; }
+  .b-no  { fill: var(--rust-wash); stroke: var(--rust); stroke-width: 1.4; }
+  .t     { font-family: var(--mono); font-size: 13px; fill: var(--ink); }
+  .t.s   { font-size: 11px; }
+  .t.m   { fill: var(--ink-soft); }
+  .t.g   { fill: var(--pine); font-weight: 500; }
+  .t.r   { fill: var(--rust); font-weight: 500; }
+  .ph    { font-family: var(--mono); font-size: 12px; font-weight: 600;
+           letter-spacing: .18em; fill: var(--ink-soft); }
+  .ln    { fill: none; stroke: var(--ink-soft); stroke-width: 1.4; }
+  .ln.f  { stroke: var(--rule); stroke-width: 1; }
+  .ah    { fill: var(--ink-soft); }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <h1>Authentication flow</h1>
+  <p class="sub">HOTEL-BOOKING-APP &nbsp;·&nbsp; REGISTER &nbsp;→&nbsp; LOGIN &nbsp;→&nbsp; PROTECTED ROUTE</p>
+
+  <svg viewBox="0 0 1000 1400" role="img"
+       aria-label="Complete authentication flow in three phases. Phase 1 register: the client posts credentials, the ValidationPipe and AuthService run, UsersService saves the document, the pre-save hook bcrypt-hashes the password, MongoDB stores only the hash, and a signed JWT returns with 201. Phase 2 login: the app loads the user with an explicit password select, bcrypt.compare checks the submitted password, returning 200 with a token on a match or 401 otherwise. Phase 3 protected route: JwtStrategy extracts the bearer token, verifies its signature against AUTH_SECRET, and either populates req.user for the controller or returns 401.">
+    <defs>
+      <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5"
+              markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse">
+        <path d="M0,1 L9,5 L0,9 z" class="ah"/>
+      </marker>
+    </defs>
+
+    <!-- ================= PHASE 1 ================= -->
+    <text class="ph" x="40" y="26">PHASE 1 — REGISTER</text>
+    <path class="ln f" d="M240,21 H960"/>
+
+    <rect class="b" x="270" y="72" width="460" height="54"/>
+    <text class="t"   x="500" y="95"  text-anchor="middle">POST /auth/register</text>
+    <text class="t s m" x="500" y="114" text-anchor="middle">{ name, email, password }</text>
+    <text class="t s m" x="250" y="104" text-anchor="end">client</text>
+
+    <path class="ln" d="M500,126 V148" marker-end="url(#ah)"/>
+
+    <rect class="b" x="270" y="154" width="460" height="54"/>
+    <text class="t"   x="500" y="177" text-anchor="middle">ValidationPipe → AuthService.register()</text>
+    <text class="t s m" x="500" y="196" text-anchor="middle">strips unknown fields · 409 if email exists</text>
+
+    <path class="ln" d="M500,208 V230" marker-end="url(#ah)"/>
+
+    <rect class="b" x="270" y="236" width="460" height="54"/>
+    <text class="t"   x="500" y="259" text-anchor="middle">UsersService.create(dto)</text>
+    <text class="t s m" x="500" y="278" text-anchor="middle">userModel.create() → document.save()</text>
+
+    <path class="ln" d="M500,290 V312" marker-end="url(#ah)"/>
+
+    <rect class="b-key" x="270" y="318" width="460" height="66"/>
+    <text class="t g" x="500" y="345" text-anchor="middle">pre('save') hook</text>
+    <text class="t g" x="500" y="367" text-anchor="middle">bcrypt.hash(password, 10)</text>
+    <text class="t s m" x="750" y="345">the one gate every</text>
+    <text class="t s m" x="750" y="361">write path passes</text>
+    <text class="t s m" x="750" y="377">through</text>
+
+    <path class="ln" d="M500,384 V406" marker-end="url(#ah)"/>
+
+    <rect class="b" x="270" y="412" width="460" height="54"/>
+    <text class="t"   x="500" y="435" text-anchor="middle">MongoDB stores the hash</text>
+    <text class="t s g" x="500" y="454" text-anchor="middle">$2b$10$6Zit6lMRSo3bG3zfEhkyKew…</text>
+    <text class="t s m" x="250" y="444" text-anchor="end">database</text>
+
+    <path class="ln" d="M500,466 V488" marker-end="url(#ah)"/>
+
+    <rect class="b-ok" x="270" y="494" width="460" height="54"/>
+    <text class="t g" x="500" y="517" text-anchor="middle">201 Created — { accessToken, user }</text>
+    <text class="t s m" x="500" y="536" text-anchor="middle">jwt.sign(payload, AUTH_SECRET)</text>
+
+    <!-- ================= PHASE 2 ================= -->
+    <text class="ph" x="40" y="610">PHASE 2 — LOGIN</text>
+    <path class="ln f" d="M200,605 H960"/>
+
+    <rect class="b" x="270" y="640" width="460" height="54"/>
+    <text class="t"   x="500" y="663" text-anchor="middle">POST /auth/login</text>
+    <text class="t s m" x="500" y="682" text-anchor="middle">{ email, password }</text>
+    <text class="t s m" x="250" y="672" text-anchor="end">client</text>
+
+    <path class="ln" d="M500,694 V716" marker-end="url(#ah)"/>
+
+    <rect class="b" x="270" y="722" width="460" height="54"/>
+    <text class="t"   x="500" y="745" text-anchor="middle">findByEmailWithPassword()</text>
+    <text class="t s m" x="500" y="764" text-anchor="middle">.select('+password') — the hash is select:false</text>
+
+    <path class="ln" d="M500,776 V798" marker-end="url(#ah)"/>
+
+    <rect class="b-key" x="270" y="804" width="460" height="66"/>
+    <text class="t g" x="500" y="831" text-anchor="middle">bcrypt.compare()</text>
+    <text class="t g" x="500" y="853" text-anchor="middle">submitted password vs stored hash</text>
+
+    <path class="ln" d="M500,870 V892 H370 V914" marker-end="url(#ah)"/>
+    <path class="ln" d="M500,870 V892 H630 V914" marker-end="url(#ah)"/>
+    <text class="t s g" x="358" y="886" text-anchor="end">match</text>
+    <text class="t s r" x="642" y="886">no match</text>
+
+    <rect class="b-ok" x="250" y="914" width="240" height="54"/>
+    <text class="t g"   x="370" y="937" text-anchor="middle">200 OK</text>
+    <text class="t s m" x="370" y="956" text-anchor="middle">{ accessToken, user }</text>
+
+    <rect class="b-no" x="510" y="914" width="240" height="54"/>
+    <text class="t r"   x="630" y="937" text-anchor="middle">401 Unauthorized</text>
+    <text class="t s m" x="630" y="956" text-anchor="middle">Invalid credentials</text>
+
+    <!-- ================= PHASE 3 ================= -->
+    <text class="ph" x="40" y="1030">PHASE 3 — PROTECTED ROUTE</text>
+    <path class="ln f" d="M320,1025 H960"/>
+
+    <rect class="b" x="270" y="1060" width="460" height="54"/>
+    <text class="t"   x="500" y="1083" text-anchor="middle">GET /bookings</text>
+    <text class="t s m" x="500" y="1102" text-anchor="middle">Authorization: Bearer &lt;accessToken&gt;</text>
+    <text class="t s m" x="250" y="1092" text-anchor="end">client</text>
+
+    <path class="ln" d="M500,1114 V1136" marker-end="url(#ah)"/>
+
+    <rect class="b" x="270" y="1142" width="460" height="54"/>
+    <text class="t"   x="500" y="1165" text-anchor="middle">JwtStrategy</text>
+    <text class="t s m" x="500" y="1184" text-anchor="middle">ExtractJwt.fromAuthHeaderAsBearerToken()</text>
+
+    <path class="ln" d="M500,1196 V1218" marker-end="url(#ah)"/>
+
+    <rect class="b-key" x="270" y="1224" width="460" height="66"/>
+    <text class="t g" x="500" y="1251" text-anchor="middle">verify signature with AUTH_SECRET</text>
+    <text class="t g" x="500" y="1273" text-anchor="middle">reject expired — ignoreExpiration: false</text>
+
+    <path class="ln" d="M500,1290 V1312 H370 V1334" marker-end="url(#ah)"/>
+    <path class="ln" d="M500,1290 V1312 H630 V1334" marker-end="url(#ah)"/>
+    <text class="t s g" x="358" y="1306" text-anchor="end">valid</text>
+    <text class="t s r" x="642" y="1306">invalid</text>
+
+    <rect class="b-ok" x="250" y="1334" width="240" height="54"/>
+    <text class="t g"   x="370" y="1357" text-anchor="middle">controller runs</text>
+    <text class="t s m" x="370" y="1376" text-anchor="middle">req.user = { userId, … }</text>
+
+    <rect class="b-no" x="510" y="1334" width="240" height="54"/>
+    <text class="t r"   x="630" y="1357" text-anchor="middle">401 Unauthorized</text>
+    <text class="t s m" x="630" y="1376" text-anchor="middle">no valid token</text>
+  </svg>
+</div>
+</body>
+</html>

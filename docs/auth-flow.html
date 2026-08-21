@@ -1,0 +1,566 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hotel Booking Auth Flow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@500;600&display=swap">
+
+<style>
+  :root {
+    --paper:      #EFF2F5;
+    --surface:    #FFFFFF;
+    --surface-2:  #F7F9FB;
+    --ink:        #131C26;
+    --ink-soft:   #54636F;
+    --rule:       #D2D9E0;
+    --rule-soft:  #E3E8ED;
+    --blue:       #2B5B8C;
+    --rust:       #A62F1E;
+    --rust-wash:  #FAEDEA;
+    --pine:       #1C6B58;
+    --pine-wash:  #E5F3EF;
+
+    --serif: "IBM Plex Serif", Georgia, "Times New Roman", serif;
+    --sans:  "IBM Plex Sans", -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    --mono:  "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:      #0E141A;
+      --surface:    #171F27;
+      --surface-2:  #1D262F;
+      --ink:        #E3EAF0;
+      --ink-soft:   #93A2AF;
+      --rule:       #2B3742;
+      --rule-soft:  #222D37;
+      --blue:       #7FB0DF;
+      --rust:       #E8836E;
+      --rust-wash:  #2C1A15;
+      --pine:       #5EC0A3;
+      --pine-wash:  #122A25;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:      #0E141A;
+    --surface:    #171F27;
+    --surface-2:  #1D262F;
+    --ink:        #E3EAF0;
+    --ink-soft:   #93A2AF;
+    --rule:       #2B3742;
+    --rule-soft:  #222D37;
+    --blue:       #7FB0DF;
+    --rust:       #E8836E;
+    --rust-wash:  #2C1A15;
+    --pine:       #5EC0A3;
+    --pine-wash:  #122A25;
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.62;
+    margin: 0;
+    padding: 0 20px 96px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; gap: 46px; }
+
+  header { padding-top: 64px; display: flex; flex-direction: column; gap: 18px; }
+  .kicker {
+    font-family: var(--mono); font-size: 11.5px; font-weight: 500;
+    letter-spacing: .18em; color: var(--ink-soft);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .kicker::after { content: ""; flex: 1; height: 1px; background: var(--rule); }
+  h1 {
+    font-family: var(--serif); font-weight: 600; font-size: clamp(30px, 5.2vw, 44px);
+    line-height: 1.1; letter-spacing: -.015em; margin: 0; text-wrap: balance;
+  }
+  .standfirst { font-size: 18px; color: var(--ink-soft); margin: 0; max-width: 64ch; }
+
+  section { display: flex; flex-direction: column; gap: 18px; }
+  h2 {
+    font-family: var(--serif); font-weight: 600; font-size: 25px;
+    margin: 0; letter-spacing: -.01em; text-wrap: balance;
+    padding-bottom: 12px; border-bottom: 1px solid var(--rule);
+    display: flex; align-items: baseline; gap: 14px;
+  }
+  h2 .num {
+    font-family: var(--mono); font-size: 12px; font-weight: 500;
+    color: var(--ink-soft); letter-spacing: .1em;
+  }
+  h3 { font-family: var(--sans); font-weight: 600; font-size: 16px; margin: 0 0 2px; }
+  p { margin: 0; max-width: 70ch; }
+  a { color: var(--blue); text-underline-offset: 3px; }
+  a:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
+  code {
+    font-family: var(--mono); font-size: .875em;
+    background: var(--surface-2); border: 1px solid var(--rule-soft);
+    padding: .08em .34em; border-radius: 2px; word-break: break-word;
+  }
+
+  figure { margin: 0; display: flex; flex-direction: column; gap: 12px; }
+  .canvas {
+    overflow-x: auto; background: var(--surface);
+    border: 1px solid var(--rule); padding: 20px;
+  }
+  .canvas svg { display: block; width: 100%; min-width: 680px; height: auto; }
+  figcaption { font-size: 13.5px; color: var(--ink-soft); font-family: var(--mono); }
+
+  .dg-box   { fill: var(--surface-2); stroke: var(--rule); stroke-width: 1; }
+  .dg-bad   { fill: var(--rust-wash); stroke: var(--rust); stroke-width: 1.25; }
+  .dg-good  { fill: var(--pine-wash); stroke: var(--pine); stroke-width: 1.75; }
+  .dg-dead  { fill: none; stroke: var(--rule); stroke-width: 1; stroke-dasharray: 4 4; }
+  .dg-t     { font-family: var(--mono); font-size: 11.5px; fill: var(--ink); }
+  .dg-t.sm  { font-size: 10.5px; }
+  .dg-t.mut { fill: var(--ink-soft); }
+  .dg-t.bad { fill: var(--rust); }
+  .dg-t.good{ fill: var(--pine); font-weight: 500; }
+  .dg-lane  { font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em; fill: var(--ink-soft); }
+  .dg-line  { fill: none; stroke: var(--ink-soft); stroke-width: 1.25; }
+  .dg-line.faint { stroke: var(--rule); stroke-dasharray: 4 4; stroke-width: 1; }
+  .dg-ah    { fill: var(--ink-soft); }
+
+  pre {
+    font-family: var(--mono); font-size: 12.5px; line-height: 1.75;
+    background: var(--surface); border: 1px solid var(--rule);
+    padding: 16px 18px; overflow-x: auto; margin: 0;
+  }
+  pre .ok  { color: var(--pine); }
+  pre .no  { color: var(--rust); }
+  pre .cmt { color: var(--ink-soft); }
+
+  .tablewrap { overflow-x: auto; border: 1px solid var(--rule); background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 18px; border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
+  thead th {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em;
+    color: var(--ink-soft); font-weight: 500; background: var(--surface-2);
+    border-bottom: 1px solid var(--rule);
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td:first-child { font-family: var(--mono); font-size: 12.5px; white-space: nowrap; color: var(--blue); }
+  td:last-child { color: var(--ink-soft); }
+
+  .note {
+    background: var(--surface); border: 1px solid var(--rule);
+    border-left: 3px solid var(--blue); padding: 18px 22px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .note.warn { border-left-color: var(--rust); }
+  .note .lbl {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .16em;
+    color: var(--blue); font-weight: 600;
+  }
+  .note.warn .lbl { color: var(--rust); }
+
+  .caveats { display: flex; flex-direction: column; border-top: 1px solid var(--rule); }
+  .caveat { display: grid; grid-template-columns: 104px 1fr; gap: 16px; padding: 15px 0; border-bottom: 1px solid var(--rule-soft); }
+  .caveat .tag { font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em; color: var(--ink-soft); padding-top: 4px; }
+  .caveat p { font-size: 15px; }
+
+  @media (max-width: 620px) {
+    .caveat { grid-template-columns: 1fr; gap: 4px; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <div class="kicker">AUTH REFERENCE &nbsp;/&nbsp; HOTEL-BOOKING-APP</div>
+    <h1>How authentication works now</h1>
+    <p class="standfirst">
+      Three flows — register, login, and reaching a protected route — plus the one secret that ties
+      the last two together. Everything below is the verified, working path.
+    </p>
+  </header>
+
+  <!-- ========== 01 REGISTER ========== -->
+  <section>
+    <h2><span class="num">01</span> Registration</h2>
+    <p>
+      The password is hashed inside the Mongoose <code>pre('save')</code> hook, not in a service.
+      That matters: <code>save()</code> is the one gate every write passes through, so a caller
+      cannot forget to hash — there is no caller involved in the decision.
+    </p>
+
+    <figure>
+      <div class="canvas">
+        <svg viewBox="0 0 900 512" role="img"
+             aria-label="Registration flow across three lanes. Client sends POST /auth/register. The Nest app validates the DTO, rejects duplicate emails after a findOne on MongoDB, calls UsersService.create, then the pre-save hook bcrypt-hashes the password before MongoDB stores the hash. The app signs a JWT and returns 201 with an access token.">
+          <defs>
+            <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,1 L9,5 L0,9 z" class="dg-ah"/>
+            </marker>
+          </defs>
+
+          <text class="dg-lane" x="110" y="22" text-anchor="middle">CLIENT</text>
+          <text class="dg-lane" x="440" y="22" text-anchor="middle">NEST APPLICATION</text>
+          <text class="dg-lane" x="790" y="22" text-anchor="middle">MONGODB</text>
+          <path class="dg-line faint" d="M232,34 V496"/>
+          <path class="dg-line faint" d="M668,34 V496"/>
+
+          <rect class="dg-box" x="20" y="48" width="180" height="56"/>
+          <text class="dg-t"     x="110" y="72" text-anchor="middle">POST /auth/register</text>
+          <text class="dg-t sm mut" x="110" y="90" text-anchor="middle">{ name, email, password }</text>
+
+          <rect class="dg-box" x="270" y="48" width="340" height="56"/>
+          <text class="dg-t"     x="440" y="72" text-anchor="middle">ValidationPipe</text>
+          <text class="dg-t sm mut" x="440" y="90" text-anchor="middle">validates DTO · strips unknown fields</text>
+          <path class="dg-line" d="M200,76 H264" marker-end="url(#a1)"/>
+
+          <rect class="dg-box" x="270" y="124" width="340" height="56"/>
+          <text class="dg-t"     x="440" y="148" text-anchor="middle">AuthService.register()</text>
+          <text class="dg-t sm mut" x="440" y="166" text-anchor="middle">409 Conflict if the email already exists</text>
+          <path class="dg-line" d="M440,104 V118" marker-end="url(#a1)"/>
+
+          <rect class="dg-box" x="700" y="124" width="180" height="56"/>
+          <text class="dg-t" x="790" y="158" text-anchor="middle">findOne({ email })</text>
+          <path class="dg-line" d="M610,152 H694" marker-end="url(#a1)"/>
+
+          <rect class="dg-box" x="270" y="200" width="340" height="56"/>
+          <text class="dg-t"     x="440" y="224" text-anchor="middle">UsersService.create(dto)</text>
+          <text class="dg-t sm mut" x="440" y="242" text-anchor="middle">userModel.create() → document.save()</text>
+          <path class="dg-line" d="M440,180 V194" marker-end="url(#a1)"/>
+
+          <rect class="dg-good" x="270" y="276" width="340" height="68"/>
+          <text class="dg-t good" x="440" y="304" text-anchor="middle">pre('save') hook</text>
+          <text class="dg-t good" x="440" y="324" text-anchor="middle">bcrypt.hash(password, 10)</text>
+          <path class="dg-line" d="M440,256 V270" marker-end="url(#a1)"/>
+
+          <rect class="dg-box" x="700" y="282" width="180" height="56"/>
+          <text class="dg-t sm mut" x="790" y="306" text-anchor="middle">stored as</text>
+          <text class="dg-t good"   x="790" y="324" text-anchor="middle">$2b$10$6Zit…</text>
+          <path class="dg-line" d="M610,310 H694" marker-end="url(#a1)"/>
+
+          <rect class="dg-box" x="270" y="368" width="340" height="56"/>
+          <text class="dg-t"     x="440" y="392" text-anchor="middle">signToken()</text>
+          <text class="dg-t sm mut" x="440" y="410" text-anchor="middle">jwt.sign(payload, AUTH_SECRET)</text>
+          <path class="dg-line" d="M440,344 V362" marker-end="url(#a1)"/>
+
+          <rect class="dg-good" x="20" y="444" width="180" height="56"/>
+          <text class="dg-t good"   x="110" y="468" text-anchor="middle">201 Created</text>
+          <text class="dg-t sm mut" x="110" y="486" text-anchor="middle">{ accessToken, user }</text>
+          <path class="dg-line" d="M440,424 V472 H206" marker-end="url(#a1)"/>
+        </svg>
+      </div>
+      <figcaption>Registering also logs you in — the token comes back with the 201.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ========== 02 LOGIN ========== -->
+  <section>
+    <h2><span class="num">02</span> Login</h2>
+    <p>
+      The stored hash is marked <code>select: false</code>, so ordinary queries never return it and
+      it cannot leak through a response by accident. Login is the one place allowed to ask for it,
+      which is why it goes through <code>findByEmailWithPassword()</code> rather than the plain
+      <code>findByEmail()</code>.
+    </p>
+
+    <figure>
+      <div class="canvas">
+        <svg viewBox="0 0 900 412" role="img"
+             aria-label="Login flow. Client sends POST /auth/login. The app looks the user up with findByEmailWithPassword, which explicitly selects the normally hidden hash, then bcrypt.compare checks the submitted password against it. A match signs a JWT and returns 200; no match returns 401.">
+          <defs>
+            <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,1 L9,5 L0,9 z" class="dg-ah"/>
+            </marker>
+          </defs>
+
+          <text class="dg-lane" x="110" y="22" text-anchor="middle">CLIENT</text>
+          <text class="dg-lane" x="440" y="22" text-anchor="middle">NEST APPLICATION</text>
+          <text class="dg-lane" x="790" y="22" text-anchor="middle">MONGODB</text>
+          <path class="dg-line faint" d="M232,34 V396"/>
+          <path class="dg-line faint" d="M668,34 V396"/>
+
+          <rect class="dg-box" x="20" y="48" width="180" height="56"/>
+          <text class="dg-t"     x="110" y="72" text-anchor="middle">POST /auth/login</text>
+          <text class="dg-t sm mut" x="110" y="90" text-anchor="middle">{ email, password }</text>
+
+          <rect class="dg-box" x="270" y="48" width="340" height="56"/>
+          <text class="dg-t"     x="440" y="72" text-anchor="middle">AuthService.login()</text>
+          <text class="dg-t sm mut" x="440" y="90" text-anchor="middle">401 for unknown email — same message</text>
+          <path class="dg-line" d="M200,76 H264" marker-end="url(#a2)"/>
+
+          <rect class="dg-box" x="270" y="124" width="340" height="56"/>
+          <text class="dg-t"     x="440" y="148" text-anchor="middle">findByEmailWithPassword()</text>
+          <text class="dg-t sm mut" x="440" y="166" text-anchor="middle">.select('+password')</text>
+          <path class="dg-line" d="M440,104 V118" marker-end="url(#a2)"/>
+
+          <rect class="dg-box" x="700" y="124" width="180" height="56"/>
+          <text class="dg-t sm mut" x="790" y="148" text-anchor="middle">returns user</text>
+          <text class="dg-t"        x="790" y="166" text-anchor="middle">+ stored hash</text>
+          <path class="dg-line" d="M610,152 H694" marker-end="url(#a2)"/>
+
+          <rect class="dg-good" x="270" y="212" width="340" height="68"/>
+          <text class="dg-t good" x="440" y="240" text-anchor="middle">bcrypt.compare()</text>
+          <text class="dg-t good" x="440" y="260" text-anchor="middle">submitted password vs stored hash</text>
+          <path class="dg-line" d="M440,180 V206" marker-end="url(#a2)"/>
+
+          <rect class="dg-good" x="256" y="326" width="180" height="56"/>
+          <text class="dg-t good"   x="346" y="350" text-anchor="middle">200 OK</text>
+          <text class="dg-t sm mut" x="346" y="368" text-anchor="middle">{ accessToken, user }</text>
+
+          <rect class="dg-bad" x="466" y="326" width="180" height="56"/>
+          <text class="dg-t bad"    x="556" y="350" text-anchor="middle">401 Unauthorized</text>
+          <text class="dg-t sm mut" x="556" y="368" text-anchor="middle">Invalid credentials</text>
+
+          <path class="dg-line" d="M440,280 V302 H346 V320" marker-end="url(#a2)"/>
+          <path class="dg-line" d="M440,280 V302 H556 V320" marker-end="url(#a2)"/>
+          <text class="dg-t sm good" x="300" y="316" text-anchor="middle">match</text>
+          <text class="dg-t sm bad"  x="608" y="316" text-anchor="middle">no match</text>
+        </svg>
+      </div>
+      <figcaption>Unknown email and wrong password return the identical 401 — no account enumeration.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ========== 03 PROTECTED ========== -->
+  <section>
+    <h2><span class="num">03</span> Reaching a protected route</h2>
+    <p>
+      The token from step 1 or 2 goes back on every subsequent request as
+      <code>Authorization: Bearer &lt;token&gt;</code>. <code>JwtStrategy</code> pulls it off the
+      header, verifies the signature, and hands the decoded payload to your controller as
+      <code>req.user</code>.
+    </p>
+
+    <figure>
+      <div class="canvas">
+        <svg viewBox="0 0 900 312" role="img"
+             aria-label="Protected route flow. Client sends a request with an Authorization Bearer header. JwtStrategy extracts the token, verifies its signature against AUTH_SECRET and rejects expired tokens with 401. On success validate() populates req.user and the controller runs.">
+          <defs>
+            <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,1 L9,5 L0,9 z" class="dg-ah"/>
+            </marker>
+          </defs>
+
+          <text class="dg-lane" x="110" y="22" text-anchor="middle">CLIENT</text>
+          <text class="dg-lane" x="485" y="22" text-anchor="middle">NEST APPLICATION</text>
+          <path class="dg-line faint" d="M232,34 V296"/>
+
+          <rect class="dg-box" x="20" y="48" width="180" height="56"/>
+          <text class="dg-t"     x="110" y="72" text-anchor="middle">GET /bookings</text>
+          <text class="dg-t sm mut" x="110" y="90" text-anchor="middle">Bearer &lt;token&gt;</text>
+
+          <rect class="dg-box" x="270" y="48" width="430" height="56"/>
+          <text class="dg-t"     x="485" y="72" text-anchor="middle">JwtStrategy</text>
+          <text class="dg-t sm mut" x="485" y="90" text-anchor="middle">ExtractJwt.fromAuthHeaderAsBearerToken()</text>
+          <path class="dg-line" d="M200,76 H264" marker-end="url(#a3)"/>
+
+          <rect class="dg-good" x="270" y="124" width="430" height="68"/>
+          <text class="dg-t good" x="485" y="152" text-anchor="middle">verify signature with AUTH_SECRET</text>
+          <text class="dg-t good" x="485" y="172" text-anchor="middle">reject expired — ignoreExpiration: false</text>
+          <path class="dg-line" d="M485,104 V118" marker-end="url(#a3)"/>
+
+          <rect class="dg-bad" x="730" y="130" width="150" height="56"/>
+          <text class="dg-t bad"    x="805" y="154" text-anchor="middle">401</text>
+          <text class="dg-t sm mut" x="805" y="172" text-anchor="middle">bad or expired</text>
+          <path class="dg-line" d="M700,158 H724" marker-end="url(#a3)"/>
+
+          <rect class="dg-box" x="270" y="224" width="430" height="56"/>
+          <text class="dg-t"     x="485" y="248" text-anchor="middle">validate(payload)</text>
+          <text class="dg-t sm mut" x="485" y="266" text-anchor="middle">req.user = { userId, email, role }</text>
+          <path class="dg-line" d="M485,192 V218" marker-end="url(#a3)"/>
+
+          <rect class="dg-good" x="730" y="224" width="150" height="56"/>
+          <text class="dg-t good"   x="805" y="248" text-anchor="middle">controller</text>
+          <text class="dg-t sm mut" x="805" y="266" text-anchor="middle">runs</text>
+          <path class="dg-line" d="M700,252 H724" marker-end="url(#a3)"/>
+        </svg>
+      </div>
+      <figcaption>The payload carries id, email and role — never the password, hashed or otherwise.</figcaption>
+    </figure>
+
+    <div class="note">
+      <span class="lbl">NOT YET WIRED</span>
+      <p>
+        <code>JwtStrategy</code> is registered and working, but nothing currently uses it — no route
+        carries <code>@UseGuards(AuthGuard('jwt'))</code> yet. Until you add that to
+        <code>BookingController</code> (or wherever you want it), every endpoint is still open.
+      </p>
+    </div>
+  </section>
+
+  <!-- ========== 04 SECRET ========== -->
+  <section>
+    <h2><span class="num">04</span> The one secret, two consumers</h2>
+    <p>
+      Signing and verification must read the <em>same</em> key. They didn't — that was a real bug
+      sitting in the code, and it is worth understanding because it fails in a way that gives you no
+      useful error at all.
+    </p>
+
+    <figure>
+      <div class="canvas">
+        <svg viewBox="0 0 900 216" role="img"
+             aria-label="AUTH_SECRET from the .env file feeds both the JwtModule that signs tokens and the JwtStrategy that verifies them. Both sides must read the same key.">
+          <defs>
+            <marker id="a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,1 L9,5 L0,9 z" class="dg-ah"/>
+            </marker>
+          </defs>
+
+          <rect class="dg-good" x="340" y="20" width="220" height="56"/>
+          <text class="dg-t sm mut" x="450" y="44" text-anchor="middle">.env</text>
+          <text class="dg-t good"   x="450" y="62" text-anchor="middle">AUTH_SECRET</text>
+
+          <path class="dg-line" d="M450,76 V102 H250 V126" marker-end="url(#a4)"/>
+          <path class="dg-line" d="M450,76 V102 H650 V126" marker-end="url(#a4)"/>
+
+          <rect class="dg-box" x="110" y="132" width="280" height="60"/>
+          <text class="dg-t"     x="250" y="156" text-anchor="middle">JwtModule</text>
+          <text class="dg-t sm mut" x="250" y="176" text-anchor="middle">auth.module.ts — signs the token</text>
+
+          <rect class="dg-box" x="510" y="132" width="280" height="60"/>
+          <text class="dg-t"     x="650" y="156" text-anchor="middle">JwtStrategy</text>
+          <text class="dg-t sm mut" x="650" y="176" text-anchor="middle">jwt.strategy.ts — verifies the token</text>
+        </svg>
+      </div>
+      <figcaption>Both call getOrThrow, so a missing key fails at boot rather than at 2am.</figcaption>
+    </figure>
+
+    <div class="note warn">
+      <span class="lbl">WHAT WAS BROKEN</span>
+      <p>
+        The module signed with <code>process.env.JWT_SECRET || 'yourSecretKey'</code> and the
+        strategy verified with <code>configService.get('JWT_SECRET')!</code>. Your
+        <code>.env</code> defines <code>AUTH_SECRET</code>, so signing silently used the literal
+        string <code>'yourSecretKey'</code> while verification got <code>undefined</code>. Every
+        valid token would have been rejected, with no error explaining why — the <code>!</code> was
+        asserting to the compiler that a genuinely missing value was present.
+      </p>
+    </div>
+  </section>
+
+  <!-- ========== 05 VERIFIED ========== -->
+  <section>
+    <h2><span class="num">05</span> Verified, not assumed</h2>
+    <p>
+      Run against a live instance and your real Atlas database, not a mock:
+    </p>
+<pre><span class="cmt"># the full round trip</span>
+POST /auth/register            <span class="ok">HTTP 201</span>  + accessToken
+POST /auth/login   correct pw  <span class="ok">HTTP 200</span>  + accessToken
+POST /auth/login   wrong pw    <span class="no">HTTP 401</span>  Invalid credentials
+
+<span class="cmt"># read straight back out of the users collection</span>
+stored password : "$2b$10$6Zit6lMRSo3bG3zfEhkyKew.7flDHXOOYKc8X1YQvuY4bSF6CgRle"
+is bcrypt hash  : <span class="ok">true</span>
+is plaintext    : <span class="no">false</span></pre>
+    <p>
+      Three schema tests pass and <code>tsc --noEmit</code> is clean. Five other test suites still
+      fail — all pre-existing scaffolding, listed at the bottom.
+    </p>
+  </section>
+
+  <!-- ========== 06 CHANGES ========== -->
+  <section>
+    <h2><span class="num">06</span> What changed to get here</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th scope="col">FILE</th><th scope="col">CHANGE</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>user.schema.ts</td>
+            <td>Added the <code>pre('save')</code> bcrypt hook and marked <code>password</code> as <code>select: false</code>. The hook takes no <code>next</code> callback on purpose — Mongoose detects an async hook and awaits the promise instead of passing one.</td>
+          </tr>
+          <tr>
+            <td>users.service.ts</td>
+            <td>Dropped the bcrypt import that was never called. Added <code>findByEmailWithPassword()</code> for login.</td>
+          </tr>
+          <tr>
+            <td>auth.service.ts</td>
+            <td>No longer hashes — the schema owns that. Two places hashing would double-hash and lock the user out permanently.</td>
+          </tr>
+          <tr>
+            <td>auth.controller.ts</td>
+            <td>Real <code>POST /auth/register</code> and <code>POST /auth/login</code> routes. The class was an empty body.</td>
+          </tr>
+          <tr>
+            <td>auth.module.ts</td>
+            <td>Registers <code>AuthController</code> and <code>JwtStrategy</code>, neither of which was wired in. Reads <code>AUTH_SECRET</code> via <code>getOrThrow</code>.</td>
+          </tr>
+          <tr>
+            <td>jwt.strategy.ts</td>
+            <td>Same <code>AUTH_SECRET</code> via <code>getOrThrow</code>, replacing the <code>!</code> assertion on a missing key.</td>
+          </tr>
+          <tr>
+            <td>main.ts</td>
+            <td>Global <code>ValidationPipe</code>. Without it your <code>class-validator</code> decorators never ran, and a client could smuggle <code>role: "admin"</code> into a registration payload.</td>
+          </tr>
+          <tr>
+            <td>user.schema.spec.ts</td>
+            <td>New — hook registered, plaintext becomes a hash, unmodified password is not re-hashed.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ========== 07 REMAINING ========== -->
+  <section>
+    <h2><span class="num">07</span> Still on your plate</h2>
+    <div class="caveats">
+
+      <div class="caveat">
+        <span class="tag">MIGRATION</span>
+        <p>
+          Users written before this fix are still stored in plaintext. The hook only fires on new
+          saves — it will not reach back. Treat those passwords as compromised: hash them in place
+          with a one-off script, or drop the collection if it is still dev data.
+        </p>
+      </div>
+
+      <div class="caveat">
+        <span class="tag">GUARDS</span>
+        <p>
+          Nothing is protected yet. Add <code>@UseGuards(AuthGuard('jwt'))</code> to the routes that
+          need a signed-in user — the strategy is ready and waiting.
+        </p>
+      </div>
+
+      <div class="caveat">
+        <span class="tag">GOTCHA</span>
+        <p>
+          <code>findByIdAndUpdate</code> is query middleware and does <em>not</em> run
+          <code>pre('save')</code>. <code>UpdateUserDto</code> omits <code>password</code> today so
+          there is no hole, but a future change-password feature must load the document and call
+          <code>.save()</code>, never update in place.
+        </p>
+      </div>
+
+      <div class="caveat">
+        <span class="tag">OPEN ROUTE</span>
+        <p>
+          <code>POST /users</code> still creates users. It hashes correctly now via the same hook,
+          but it is unauthenticated and sits beside <code>/auth/register</code> doing nearly the
+          same job. Consider guarding it as an admin-only endpoint.
+        </p>
+      </div>
+
+      <div class="caveat">
+        <span class="tag">PRE-EXISTING</span>
+        <p>
+          Five test suites fail, untouched by this work: <code>app.controller.spec</code> expects
+          <code>"Hello World!"</code> while <code>AppService</code> returns
+          <code>"Hello Haroon!"</code>, and four Nest scaffolding specs instantiate services with
+          none of their dependencies provided.
+        </p>
+      </div>
+
+    </div>
+  </section>
+
+</div>
+
+</html>
