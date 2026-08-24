@@ -382,11 +382,12 @@
     </figure>
 
     <div class="note">
-      <span class="lbl">NOT YET WIRED</span>
+      <span class="lbl">WIRED ON ONE ROUTE</span>
       <p>
-        <code>JwtStrategy</code> is registered and working, but nothing currently uses it — no route
-        carries <code>@UseGuards(AuthGuard('jwt'))</code> yet. Until you add that to
-        <code>BookingController</code> (or wherever you want it), every endpoint is still open.
+        <code>GET /users/me</code> carries <code>@UseGuards(JwtAuthGuard)</code> and is verified
+        working — no token, a garbage token, and a token forged with the old hard-coded secret all
+        return 401. Every other endpoint is still open, including
+        <code>BookingController</code>, which has no routes at all yet.
       </p>
     </div>
   </section>
@@ -524,8 +525,10 @@ is plaintext    : <span class="no">false</span></pre>
       <div class="caveat">
         <span class="tag">GUARDS</span>
         <p>
-          Nothing is protected yet. Add <code>@UseGuards(AuthGuard('jwt'))</code> to the routes that
-          need a signed-in user — the strategy is ready and waiting.
+          Only <code>GET /users/me</code> is protected. <code>POST /users</code>,
+          <code>GET /users</code>, <code>GET /users/:id</code>, <code>PATCH</code> and
+          <code>DELETE</code> are all still open — add <code>@UseGuards(JwtAuthGuard)</code> to the
+          ones that need a signed-in user.
         </p>
       </div>
 

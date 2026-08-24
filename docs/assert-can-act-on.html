@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>assertCanActOn</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Serif:wght@600&display=swap">
+<style>
+  :root{
+    --paper:#EFF2F5; --surface:#FFFFFF; --surface-2:#F7F9FB;
+    --ink:#131C26; --ink-soft:#54636F; --rule:#D2D9E0;
+    --rust:#A62F1E; --rust-wash:#FAEDEA;
+    --pine:#1C6B58; --pine-wash:#E5F3EF;
+    --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+    --serif:"IBM Plex Serif",Georgia,serif;
+  }
+  body{background:var(--paper);color:var(--ink);margin:0;padding:32px 24px 40px;font-family:var(--mono)}
+  .sheet{max-width:960px;margin:0 auto;background:var(--surface);border:1px solid var(--rule);padding:26px 20px 30px}
+  h1{font-family:var(--serif);font-weight:600;font-size:25px;margin:0 0 4px;text-align:center}
+  .sub{text-align:center;font-size:11.5px;color:var(--ink-soft);letter-spacing:.1em;margin:0 0 24px}
+  svg{display:block;width:100%;height:auto}
+  .b{fill:var(--surface-2);stroke:var(--rule);stroke-width:1.2}
+  .b-q{fill:var(--surface-2);stroke:var(--ink-soft);stroke-width:1.4}
+  .b-ok{fill:var(--pine-wash);stroke:var(--pine);stroke-width:1.8}
+  .b-no{fill:var(--rust-wash);stroke:var(--rust);stroke-width:1.8}
+  .hd{fill:var(--surface-2);stroke:var(--rule);stroke-width:1}
+  .t{font-family:var(--mono);font-size:13px;fill:var(--ink)}
+  .t.s{font-size:11px}
+  .t.m{fill:var(--ink-soft)}
+  .t.g{fill:var(--pine);font-weight:500}
+  .t.r{fill:var(--rust);font-weight:500}
+  .lbl{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.16em;fill:var(--ink-soft)}
+  .ln{fill:none;stroke:var(--ink-soft);stroke-width:1.4}
+  .ln.g{stroke:var(--pine)}
+  .ln.r{stroke:var(--rust)}
+  .grid{fill:none;stroke:var(--rule);stroke-width:1}
+</style>
+</head>
+<body>
+<div class="sheet">
+  <h1>assertCanActOn(targetId, actor)</h1>
+  <p class="sub">TWO WAYS TO EARN PERMISSION &nbsp;·&nbsp; EITHER ONE IS ENOUGH</p>
+
+  <svg viewBox="0 0 900 780" role="img"
+       aria-label="Decision flow. A request arrives with a target id and an actor from the token. First question: is the actor an admin? If yes, permission granted immediately. If no, second question: does the actor's own id equal the target id? If yes, permission granted. If no, throw 403 Forbidden. A table below shows four cases: a user acting on their own record is allowed via the ownership check; a user acting on someone else's record is denied; an admin acting on any record is allowed via the role check, which skips the ownership check entirely.">
+    <defs>
+      <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse">
+        <path d="M0,1 L9,5 L0,9 z" fill="#54636F"/>
+      </marker>
+      <marker id="ahg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse">
+        <path d="M0,1 L9,5 L0,9 z" fill="#1C6B58"/>
+      </marker>
+      <marker id="ahr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse">
+        <path d="M0,1 L9,5 L0,9 z" fill="#A62F1E"/>
+      </marker>
+    </defs>
+
+    <!-- incoming -->
+    <rect class="b" x="170" y="56" width="340" height="58"/>
+    <text class="t"    x="340" y="81"  text-anchor="middle">DELETE /users/&lt;targetId&gt;</text>
+    <text class="t s m" x="340" y="100" text-anchor="middle">Bearer token → actor { userId, role }</text>
+
+    <path class="ln" d="M340,114 V142" marker-end="url(#ah)"/>
+
+    <!-- decision 1 -->
+    <rect class="b-q" x="170" y="148" width="340" height="60"/>
+    <text class="t" x="340" y="184" text-anchor="middle">actor.role === 'admin' ?</text>
+
+    <path class="ln g" d="M510,178 H596" marker-end="url(#ahg)"/>
+    <text class="t s g" x="540" y="170">yes</text>
+
+    <path class="ln" d="M340,208 V246" marker-end="url(#ah)"/>
+    <text class="t s m" x="352" y="232">no</text>
+
+    <!-- decision 2 -->
+    <rect class="b-q" x="170" y="252" width="340" height="60"/>
+    <text class="t" x="340" y="288" text-anchor="middle">actor.userId === targetId ?</text>
+
+    <path class="ln g" d="M510,282 H596" marker-end="url(#ahg)"/>
+    <text class="t s g" x="540" y="274">yes</text>
+
+    <path class="ln r" d="M340,312 V350" marker-end="url(#ahr)"/>
+    <text class="t s r" x="352" y="336">no</text>
+
+    <!-- allowed -->
+    <rect class="b-ok" x="600" y="148" width="250" height="164"/>
+    <text class="t g"   x="725" y="222" text-anchor="middle">return</text>
+    <text class="t s m" x="725" y="244" text-anchor="middle">permission granted</text>
+    <text class="t s m" x="725" y="262" text-anchor="middle">nothing below runs</text>
+
+    <!-- denied -->
+    <rect class="b-no" x="170" y="356" width="340" height="60"/>
+    <text class="t r"   x="340" y="381" text-anchor="middle">throw ForbiddenException</text>
+    <text class="t s m" x="340" y="400" text-anchor="middle">403 — no route to permission found</text>
+
+    <!-- ============ examples ============ -->
+    <text class="lbl" x="40" y="480">EVERY CASE</text>
+    <path class="grid" d="M180,475 H860"/>
+
+    <rect class="hd" x="40" y="500" width="240" height="34"/>
+    <rect class="hd" x="280" y="500" width="180" height="34"/>
+    <rect class="hd" x="460" y="500" width="150" height="34"/>
+    <rect class="hd" x="610" y="500" width="130" height="34"/>
+    <rect class="hd" x="740" y="500" width="120" height="34"/>
+    <text class="t s m" x="52"  y="522">actor</text>
+    <text class="t s m" x="292" y="522">acting on</text>
+    <text class="t s m" x="472" y="522">role check</text>
+    <text class="t s m" x="622" y="522">owner check</text>
+    <text class="t s m" x="752" y="522">result</text>
+
+    <!-- row 1 -->
+    <rect class="grid" x="40" y="534" width="240" height="46"/>
+    <rect class="grid" x="280" y="534" width="180" height="46"/>
+    <rect class="grid" x="460" y="534" width="150" height="46"/>
+    <rect class="grid" x="610" y="534" width="130" height="46"/>
+    <rect class="grid" x="740" y="534" width="120" height="46"/>
+    <text class="t s"    x="52"  y="562">Alice (user)</text>
+    <text class="t s"    x="292" y="562">her own record</text>
+    <text class="t s m"  x="472" y="562">no → falls through</text>
+    <text class="t s g"  x="622" y="562">match → return</text>
+    <text class="t s g"  x="752" y="562">allowed</text>
+
+    <!-- row 2 -->
+    <rect class="grid" x="40" y="580" width="240" height="46"/>
+    <rect class="grid" x="280" y="580" width="180" height="46"/>
+    <rect class="grid" x="460" y="580" width="150" height="46"/>
+    <rect class="grid" x="610" y="580" width="130" height="46"/>
+    <rect class="grid" x="740" y="580" width="120" height="46"/>
+    <text class="t s"    x="52"  y="608">Alice (user)</text>
+    <text class="t s"    x="292" y="608">Bob's record</text>
+    <text class="t s m"  x="472" y="608">no → falls through</text>
+    <text class="t s r"  x="622" y="608">no match</text>
+    <text class="t s r"  x="752" y="608">403</text>
+
+    <!-- row 3 -->
+    <rect class="grid" x="40" y="626" width="240" height="46"/>
+    <rect class="grid" x="280" y="626" width="180" height="46"/>
+    <rect class="grid" x="460" y="626" width="150" height="46"/>
+    <rect class="grid" x="610" y="626" width="130" height="46"/>
+    <rect class="grid" x="740" y="626" width="120" height="46"/>
+    <text class="t s"    x="52"  y="654">Admin</text>
+    <text class="t s"    x="292" y="654">their own record</text>
+    <text class="t s g"  x="472" y="654">yes → return</text>
+    <text class="t s m"  x="622" y="654">never runs</text>
+    <text class="t s g"  x="752" y="654">allowed</text>
+
+    <!-- row 4 -->
+    <rect class="grid" x="40" y="672" width="240" height="46"/>
+    <rect class="grid" x="280" y="672" width="180" height="46"/>
+    <rect class="grid" x="460" y="672" width="150" height="46"/>
+    <rect class="grid" x="610" y="672" width="130" height="46"/>
+    <rect class="grid" x="740" y="672" width="120" height="46"/>
+    <text class="t s"    x="52"  y="700">Admin</text>
+    <text class="t s"    x="292" y="700">Bob's record</text>
+    <text class="t s g"  x="472" y="700">yes → return</text>
+    <text class="t s m"  x="622" y="700">never runs</text>
+    <text class="t s g"  x="752" y="700">allowed</text>
+
+    <text class="t s m" x="40" y="748">the line you selected is row 3 and row 4 — an admin never reaches the ownership check, which is the point</text>
+  </svg>
+</div>
+</body>
+</html>

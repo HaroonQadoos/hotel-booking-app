@@ -48,4 +48,14 @@ export class UsersService {
     const result = await this.userModel.findByIdAndDelete(id);
     if (!result) throw new NotFoundException('User not found');
   }
+  
+  async markEmailAsVerified(id: string): Promise<User> {
+    const user = await this.userModel.findByIdAndUpdate(
+      id,
+      { isEmailVerified: true },
+      { new: true },
+    );
+    if (!user) throw new NotFoundException('User not found');
+    return user;
+  }
 }

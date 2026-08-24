@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Project Flow Diagram</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Serif:wght@600&display=swap">
+<style>
+  /* Single committed light look: this page is exported to PNG, so the
+     rendering has to be deterministic rather than theme-dependent. */
+  :root {
+    --paper:#EFF2F5; --surface:#FFFFFF; --surface-2:#F7F9FB;
+    --ink:#131C26; --ink-soft:#54636F; --rule:#D2D9E0;
+    --blue:#2B5B8C; --blue-wash:#EAF1F8;
+    --rust:#A62F1E; --rust-wash:#FAEDEA;
+    --pine:#1C6B58; --pine-wash:#E5F3EF;
+    --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+    --serif:"IBM Plex Serif",Georgia,serif;
+  }
+  body{background:var(--paper);color:var(--ink);margin:0;padding:36px 24px 48px;font-family:var(--mono);-webkit-font-smoothing:antialiased}
+  .sheet{max-width:1180px;margin:0 auto;background:var(--surface);border:1px solid var(--rule);padding:28px 20px 34px}
+  h1{font-family:var(--serif);font-weight:600;font-size:28px;margin:0 0 4px;text-align:center}
+  .sub{text-align:center;font-size:12px;color:var(--ink-soft);letter-spacing:.1em;margin:0 0 28px}
+  svg{display:block;width:100%;height:auto}
+  .b{fill:var(--surface-2);stroke:var(--rule);stroke-width:1.2}
+  .b-app{fill:var(--blue-wash);stroke:var(--blue);stroke-width:1.6}
+  .b-key{fill:var(--pine-wash);stroke:var(--pine);stroke-width:2}
+  .b-opt{fill:var(--surface-2);stroke:var(--ink-soft);stroke-width:1.2;stroke-dasharray:5 4}
+  .b-stub{fill:none;stroke:var(--rule);stroke-width:1;stroke-dasharray:4 4}
+  .t{font-family:var(--mono);font-size:12.5px;fill:var(--ink)}
+  .t.s{font-size:10.5px}
+  .t.m{fill:var(--ink-soft)}
+  .t.g{fill:var(--pine);font-weight:500}
+  .t.bl{fill:var(--blue);font-weight:500}
+  .ph{font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.18em;fill:var(--ink-soft)}
+  .ln{fill:none;stroke:var(--ink-soft);stroke-width:1.4}
+  .ln.f{stroke:var(--rule);stroke-width:1}
+  .ah{fill:var(--ink-soft)}
+</style>
+</head>
+<body>
+<div class="sheet">
+  <h1>hotel-booking-app — project flow</h1>
+  <p class="sub">BOOTSTRAP &nbsp;→&nbsp; MODULE GRAPH &nbsp;→&nbsp; REQUEST PIPELINE</p>
+
+  <svg viewBox="0 0 1100 1250" role="img"
+       aria-label="Three-part project diagram. Bootstrap: node dist/main runs a DNS guard, creates the Nest app from AppModule, installs a global ValidationPipe and listens on the port. Module graph: AppModule imports ConfigModule, MongooseModule, BookingModule, UsersModule and AuthModule; AuthModule additionally imports UsersModule, PassportModule and JwtModule. Request pipeline: an HTTP request passes the global ValidationPipe, an optional JwtAuthGuard, a controller, a service, the Mongoose model where the pre-save bcrypt hook runs on writes, MongoDB Atlas, and returns through UserResponseDto which strips the password.">
+    <defs>
+      <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse">
+        <path d="M0,1 L9,5 L0,9 z" class="ah"/>
+      </marker>
+    </defs>
+
+    <!-- ============ A. BOOTSTRAP ============ -->
+    <text class="ph" x="35" y="32">BOOTSTRAP — main.ts</text>
+    <path class="ln f" d="M300,27 H1065"/>
+
+    <rect class="b" x="35" y="52" width="190" height="60"/>
+    <text class="t"   x="130" y="78" text-anchor="middle">npm run start:dev</text>
+    <text class="t s m" x="130" y="97" text-anchor="middle">nest start --watch</text>
+
+    <rect class="b" x="245" y="52" width="190" height="60"/>
+    <text class="t"   x="340" y="78" text-anchor="middle">DNS guard</text>
+    <text class="t s m" x="340" y="97" text-anchor="middle">fixes resolveSrv()</text>
+
+    <rect class="b-app" x="455" y="52" width="190" height="60"/>
+    <text class="t bl"  x="550" y="78" text-anchor="middle">NestFactory.create</text>
+    <text class="t s m" x="550" y="97" text-anchor="middle">(AppModule)</text>
+
+    <rect class="b" x="665" y="52" width="190" height="60"/>
+    <text class="t"   x="760" y="78" text-anchor="middle">useGlobalPipes</text>
+    <text class="t s m" x="760" y="97" text-anchor="middle">ValidationPipe</text>
+
+    <rect class="b" x="875" y="52" width="190" height="60"/>
+    <text class="t"   x="970" y="78" text-anchor="middle">app.listen()</text>
+    <text class="t s m" x="970" y="97" text-anchor="middle">PORT from .env</text>
+
+    <path class="ln" d="M225,82 H239" marker-end="url(#ah)"/>
+    <path class="ln" d="M435,82 H449" marker-end="url(#ah)"/>
+    <path class="ln" d="M645,82 H659" marker-end="url(#ah)"/>
+    <path class="ln" d="M855,82 H869" marker-end="url(#ah)"/>
+
+    <!-- ============ B. MODULE GRAPH ============ -->
+    <text class="ph" x="35" y="172">MODULE GRAPH</text>
+    <path class="ln f" d="M200,167 H1065"/>
+
+    <rect class="b-app" x="455" y="192" width="190" height="52"/>
+    <text class="t bl" x="550" y="223" text-anchor="middle">AppModule</text>
+
+    <path class="ln" d="M550,244 V266 H130 V286" marker-end="url(#ah)"/>
+    <path class="ln" d="M550,244 V266 H340 V286" marker-end="url(#ah)"/>
+    <path class="ln" d="M550,266 V286" marker-end="url(#ah)"/>
+    <path class="ln" d="M550,244 V266 H760 V286" marker-end="url(#ah)"/>
+    <path class="ln" d="M550,244 V266 H970 V286" marker-end="url(#ah)"/>
+
+    <rect class="b" x="35" y="292" width="190" height="60"/>
+    <text class="t"   x="130" y="318" text-anchor="middle">ConfigModule</text>
+    <text class="t s m" x="130" y="337" text-anchor="middle">isGlobal: true · .env</text>
+
+    <rect class="b" x="245" y="292" width="190" height="60"/>
+    <text class="t"   x="340" y="318" text-anchor="middle">MongooseModule</text>
+    <text class="t s m" x="340" y="337" text-anchor="middle">MONGODB_URI</text>
+
+    <rect class="b-stub" x="455" y="292" width="190" height="60"/>
+    <text class="t m"   x="550" y="318" text-anchor="middle">BookingModule</text>
+    <text class="t s m" x="550" y="337" text-anchor="middle">empty stub — no routes</text>
+
+    <rect class="b" x="665" y="292" width="190" height="60"/>
+    <text class="t"   x="760" y="318" text-anchor="middle">UsersModule</text>
+    <text class="t s m" x="760" y="337" text-anchor="middle">exports UsersService</text>
+
+    <rect class="b" x="875" y="292" width="190" height="60"/>
+    <text class="t"   x="970" y="318" text-anchor="middle">AuthModule</text>
+    <text class="t s m" x="970" y="337" text-anchor="middle">controller + strategy</text>
+
+    <path class="ln" d="M875,322 H859" marker-end="url(#ah)"/>
+    <text class="t s m" x="867" y="366" text-anchor="middle">imports</text>
+
+    <path class="ln" d="M970,352 V382 H855 V398" marker-end="url(#ah)"/>
+    <path class="ln" d="M970,352 V382 H1000 V398" marker-end="url(#ah)"/>
+
+    <rect class="b" x="790" y="404" width="130" height="52"/>
+    <text class="t s"   x="855" y="426" text-anchor="middle">PassportModule</text>
+    <text class="t s m" x="855" y="443" text-anchor="middle">guard plumbing</text>
+
+    <rect class="b" x="935" y="404" width="130" height="52"/>
+    <text class="t s"   x="1000" y="426" text-anchor="middle">JwtModule</text>
+    <text class="t s m" x="1000" y="443" text-anchor="middle">AUTH_SECRET</text>
+
+    <!-- ============ C. REQUEST PIPELINE ============ -->
+    <text class="ph" x="35" y="512">REQUEST PIPELINE</text>
+    <path class="ln f" d="M240,507 H1065"/>
+
+    <rect class="b" x="330" y="532" width="440" height="56"/>
+    <text class="t"   x="550" y="557" text-anchor="middle">incoming HTTP request</text>
+    <text class="t s m" x="550" y="576" text-anchor="middle">POST /auth/login · GET /users/me</text>
+
+    <path class="ln" d="M550,588 V610" marker-end="url(#ah)"/>
+
+    <rect class="b" x="330" y="616" width="440" height="60"/>
+    <text class="t"   x="550" y="641" text-anchor="middle">global ValidationPipe</text>
+    <text class="t s m" x="550" y="660" text-anchor="middle">whitelist · forbidNonWhitelisted · transform</text>
+    <text class="t s m" x="790" y="647">400 if the DTO fails</text>
+
+    <path class="ln" d="M550,676 V698" marker-end="url(#ah)"/>
+
+    <rect class="b-opt" x="330" y="704" width="440" height="60"/>
+    <text class="t"   x="550" y="729" text-anchor="middle">JwtAuthGuard → JwtStrategy.validate()</text>
+    <text class="t s m" x="550" y="748" text-anchor="middle">verifies signature · sets req.user</text>
+    <text class="t s m" x="790" y="728">guarded routes only —</text>
+    <text class="t s m" x="790" y="744">today just /users/me</text>
+
+    <path class="ln" d="M550,764 V786" marker-end="url(#ah)"/>
+
+    <rect class="b" x="330" y="792" width="440" height="60"/>
+    <text class="t"   x="550" y="817" text-anchor="middle">Controller</text>
+    <text class="t s m" x="550" y="836" text-anchor="middle">AppController · UsersController · AuthController</text>
+    <text class="t s m" x="790" y="826">routing + shaping only</text>
+
+    <path class="ln" d="M550,852 V874" marker-end="url(#ah)"/>
+
+    <rect class="b" x="330" y="880" width="440" height="60"/>
+    <text class="t"   x="550" y="905" text-anchor="middle">Service</text>
+    <text class="t s m" x="550" y="924" text-anchor="middle">UsersService · AuthService</text>
+    <text class="t s m" x="790" y="914">business rules live here</text>
+
+    <path class="ln" d="M550,940 V962" marker-end="url(#ah)"/>
+
+    <rect class="b-key" x="330" y="968" width="440" height="64"/>
+    <text class="t g" x="550" y="994" text-anchor="middle">Mongoose model → document.save()</text>
+    <text class="t g" x="550" y="1015" text-anchor="middle">pre('save') → bcrypt.hash — writes only</text>
+    <text class="t s m" x="790" y="1000">the single hashing gate</text>
+
+    <path class="ln" d="M550,1032 V1054" marker-end="url(#ah)"/>
+
+    <rect class="b" x="330" y="1060" width="440" height="52"/>
+    <text class="t" x="550" y="1091" text-anchor="middle">MongoDB Atlas</text>
+
+    <path class="ln" d="M550,1112 V1134" marker-end="url(#ah)"/>
+
+    <rect class="b-key" x="330" y="1140" width="440" height="64"/>
+    <text class="t g" x="550" y="1166" text-anchor="middle">UserResponseDto → HTTP response</text>
+    <text class="t s m" x="550" y="1187" text-anchor="middle">id · name · email · role · createdAt — never password</text>
+  </svg>
+</div>
+</body>
+</html>
