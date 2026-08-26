@@ -25,7 +25,9 @@ describe('User schema password hashing', () => {
 
     expect(doc.password).not.toBe('supersecret123');
     expect(doc.password).toMatch(/^\$2[aby]\$/);
-    await expect(bcrypt.compare('supersecret123', doc.password)).resolves.toBe(true);
+    await expect(bcrypt.compare('supersecret123', doc.password)).resolves.toBe(
+      true,
+    );
   });
 
   it('does not re-hash when the password was not modified', async () => {
@@ -36,4 +38,33 @@ describe('User schema password hashing', () => {
 
     expect(doc.password).toBe(alreadyHashed);
   });
+});
+
+describe('User schema password reset fields', () => {
+  // Both fields hold reset-link material. They are select:false for the same
+  // reason the password hash is: a field that is never returned by default
+  // cannot leak through a response someone forgot to shape.
+  it.each([
+    ['passwordResetTokenHash', 'String'],
+    ['passwordResetExpires', 'Date'],
+  ])('declares %s as a %s', (path, instance) => {
+    const schemaPath = UserSchema.path(path);
+
+    expect(schemaPath).toBeDefined();
+    expect(schemaPath.instance).toBe(instance);
+  });
+
+  it.each(['passwordResetTokenHash', 'passwordResetExpires'])(
+    'keeps %s out of query results unless asked for',
+    (path) => {
+      expect(UserSchema.path(path).options.select).toBe(false);
+    },
+  );
+
+  it.each(['passwordResetTokenHash', 'passwordResetExpires'])(
+    'leaves %s unset on a brand new user',
+    (path) => {
+      expect(UserSchema.path(path).options.default).toBeUndefined();
+    },
+  );
 });

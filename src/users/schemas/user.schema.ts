@@ -19,9 +19,20 @@ export class User extends Document {
 
   @Prop({ default: 'user', enum: ['user', 'admin'] })
   role!: string;
-  
+
   @Prop({ default: false })
   isEmailVerified!: boolean;
+
+  // Only the sha256 digest of the reset token is kept — never the token that
+  // was emailed. select:false for the same reason as `password`: a field that
+  // is not returned by default cannot leak through a response by accident.
+  @Prop({ select: false })
+  passwordResetTokenHash?: string;
+
+  // Checked as part of the lookup query, not by the caller, so no code path
+  // can forget to reject an expired link.
+  @Prop({ select: false })
+  passwordResetExpires?: Date;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

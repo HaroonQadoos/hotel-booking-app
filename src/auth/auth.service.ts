@@ -3,8 +3,10 @@ import {
   Injectable,
   UnauthorizedException,
   ConflictException,
+  BadRequestException,
   Logger,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService, JwtSignOptions } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { UsersService } from '../users/users.service';
@@ -12,7 +14,18 @@ import { User } from '../users/schemas/user.schema';
 import { EmailVerificationPayload, JwtPayload } from './types/auth-user';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { generateResetToken, hashResetToken } from './reset-token';
 import { MailService } from '../mail/mail.service';
+
+// Deliberately says nothing about whether the address is registered. Returned
+// on both branches of forgotPassword — see the comment there.
+const RESET_REQUESTED_MESSAGE =
+  'If that email is registered, a reset link has been sent.';
+
+const DEFAULT_RESET_EXPIRES_IN_MINUTES = '15';
 
 @Injectable()
 export class AuthService {
@@ -21,6 +34,7 @@ export class AuthService {
     private readonly usersService: UsersService, // reuse existing user logic
     private readonly jwtService: JwtService, // provided by @nestjs/jwt, signs tokens
     private readonly mailService: MailService,
+    private readonly config: ConfigService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -89,6 +103,102 @@ export class AuthService {
 
     await this.usersService.markEmailAsVerified(payload.sub);
     return { message: 'Email verified successfully' };
+  }
+
+  async forgotPassword(dto: ForgotPasswordDto) {
+    const user = await this.usersService.findByEmail(dto.email);
+
+    // An unknown address takes the silent branch: nothing written, nothing
+    // sent. Both branches return the same message below, because a 404 here
+    // would turn this endpoint into a way to test which addresses have
+    // accounts.
+    if (user) {
+      const rawToken = generateResetToken();
+      const expiresAt = new Date(Date.now() + this.resetTokenLifetimeMs());
+
+      await this.usersService.setResetToken(
+        String(user._id),
+        hashResetToken(rawToken),
+        expiresAt,
+      );
+
+      // Caught rather than propagated: a dead mail server must not change the
+      // response, or the difference becomes the oracle the generic message
+      // exists to prevent. The token is already stored, so a resend works.
+      try {
+        await this.mailService.sendPasswordResetEmail(user.email, rawToken);
+      } catch (err) {
+        this.logger.error(
+          `Failed to send password reset email to ${user.email}`,
+          err,
+        );
+      }
+    }
+
+    return { message: RESET_REQUESTED_MESSAGE };
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    // Only the digest was ever stored, so the submitted token is hashed and
+    // matched against that. Forged, expired and already-spent tokens all land
+    // here as "no user" — the caller cannot tell them apart, and neither
+    // should an attacker.
+    const user = await this.usersService.findByResetTokenHash(
+      hashResetToken(dto.token),
+    );
+    if (!user) {
+      throw new UnauthorizedException('Invalid or expired reset link');
+    }
+
+    await this.usersService.replacePassword(user, dto.newPassword);
+
+    // No token issued on purpose: signing the user in here would make a
+    // stolen link strictly more valuable than it needs to be.
+    return { message: 'Password reset successfully' };
+  }
+
+  async changePassword(userId: string, dto: ChangePasswordDto) {
+    const user = await this.usersService.findByIdWithPassword(userId);
+    // The JWT outlives the record it names, so the account may be gone.
+    if (!user) throw new UnauthorizedException('Invalid credentials');
+
+    // Proving knowledge of the current password is what stops a borrowed
+    // laptop with a live session from locking the real owner out.
+    const isMatch = await bcrypt.compare(dto.currentPassword, user.password);
+    if (!isMatch) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    const isSame = await bcrypt.compare(dto.newPassword, user.password);
+    if (isSame) {
+      throw new BadRequestException(
+        'New password must be different from the current one',
+      );
+    }
+
+    await this.usersService.replacePassword(user, dto.newPassword);
+
+    return { message: 'Password changed successfully' };
+  }
+
+  private resetTokenLifetimeMs(): number {
+    const minutes = Number(
+      this.config.get<string>(
+        'PASSWORD_RESET_EXPIRES_IN',
+        DEFAULT_RESET_EXPIRES_IN_MINUTES,
+      ),
+    );
+
+    // A misconfigured value must not silently produce a token that never
+    // expires (NaN) or one already expired.
+    if (!Number.isFinite(minutes) || minutes <= 0) {
+      this.logger.warn(
+        `Ignoring invalid PASSWORD_RESET_EXPIRES_IN — using ${DEFAULT_RESET_EXPIRES_IN_MINUTES} minutes`,
+      );
+      return Number(DEFAULT_RESET_EXPIRES_IN_MINUTES) * 60_000;
+    }
+
+    return minutes * 60_000;
   }
 
   private signToken(user: User) {

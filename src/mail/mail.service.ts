@@ -52,4 +52,30 @@ export class MailService implements OnModuleInit {
       `Verification email to ${to} — preview: ${nodemailer.getTestMessageUrl(info)}`,
     );
   }
+
+  async sendPasswordResetEmail(to: string, rawToken: string) {
+    // Points at the frontend, not at this API: the API has no view layer, and
+    // a token in a URL this server handles would end up in its access logs.
+    const frontendUrl = this.config.get<string>(
+      'FRONTEND_URL',
+      'http://localhost:3000',
+    );
+    const url = `${frontendUrl}/reset-password?token=${encodeURIComponent(rawToken)}`;
+
+    const info = await this.transporter.sendMail({
+      from: '"My App" <no-reply@myapp.com>',
+      to,
+      subject: 'Reset your password',
+      html:
+        `<p>Click below to choose a new password. The link expires shortly.</p>` +
+        `<a href="${url}">${url}</a>` +
+        `<p>If you didn't ask for this, you can ignore this email — ` +
+        `your password will not change.</p>`,
+    });
+
+    // The token itself is deliberately not logged.
+    this.logger.log(
+      `Password reset email to ${to} — preview: ${nodemailer.getTestMessageUrl(info)}`,
+    );
+  }
 }

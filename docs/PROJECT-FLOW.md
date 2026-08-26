@@ -54,17 +54,34 @@ UserResponseDto              strips the password out of the response
 | Method | Path | Guard | Handler |
 |--------|------|-------|---------|
 | `GET` | `/` | — | `AppController.getHello` |
+| `GET` | `/test-email` | — | `AppController.testEmail` |
 | `POST` | `/auth/register` | — | `AuthController.register` |
 | `POST` | `/auth/login` | — | `AuthController.login` |
-| `POST` | `/users` | — | `UsersController.create` |
-| `GET` | `/users` | — | `UsersController.findAll` |
+| `GET` | `/auth/verify-email` | — | `AuthController.verifyEmail` |
+| `POST` | `/auth/forgot-password` | — | `AuthController.forgotPassword` |
+| `POST` | `/auth/reset-password` | — | `AuthController.resetPassword` |
+| `POST` | `/auth/change-password` | **JwtAuthGuard** | `AuthController.changePassword` |
+| `POST` | `/users` | **JwtAuthGuard + RolesGuard** (`admin`) | `UsersController.create` |
+| `GET` | `/users` | **JwtAuthGuard + RolesGuard** (`admin`) | `UsersController.findAll` |
 | `GET` | `/users/me` | **JwtAuthGuard** | `UsersController.getProfile` |
-| `GET` | `/users/:id` | — | `UsersController.findOne` |
-| `PATCH` | `/users/:id` | — | `UsersController.update` |
-| `DELETE` | `/users/:id` | — | `UsersController.remove` |
+| `GET` | `/users/:id` | **JwtAuthGuard** + owner-or-admin | `UsersController.findOne` |
+| `PATCH` | `/users/:id` | **JwtAuthGuard** + owner-or-admin | `UsersController.update` |
+| `DELETE` | `/users/:id` | **JwtAuthGuard** + owner-or-admin | `UsersController.remove` |
 
 > `/users/me` **must** stay declared above `/users/:id`. Nest matches routes in
 > declaration order — a `:id` declared first would swallow `"me"` as an id.
+
+> "owner-or-admin" is `assertCanActOn` inside the handler, not a guard: whether
+> a record is *yours* depends on the `:id` in the URL, which `RolesGuard` never
+> sees.
+
+The three password routes are documented in full — diagram and rationale — in
+[`password-reset-flow.html`](./password-reset-flow.html) (rendered:
+[`password-reset-flow.png`](./password-reset-flow.png)). The two anonymous ones
+are unguarded by necessity: someone locked out of their account has no token to
+present. `/auth/change-password` is the authenticated counterpart, and is the
+only way to change a password while signed in — `PATCH /users/:id` cannot, since
+`UpdateUserDto` omits the field.
 
 ---
 
