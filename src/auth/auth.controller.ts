@@ -6,9 +6,17 @@ import {
   HttpStatus,
   Post,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import type { Response } from 'express';
 import { AuthService } from './auth.service';
+import {
+  AUTH_COOKIE,
+  authCookieOptions,
+  clearAuthCookieOptions,
+} from './cookie';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 // `import type` is required: isolatedModules + emitDecoratorMetadata reject a
@@ -21,19 +29,59 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 
+// Whatever signToken() hands back. Derived rather than restated so a change to
+// the token payload cannot drift away from what this controller returns.
+type SessionResult = Awaited<ReturnType<AuthService['login']>>;
+
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly config: ConfigService,
+  ) {}
+
+  private get isProduction(): boolean {
+    return this.config.get<string>('NODE_ENV') === 'production';
+  }
+
+  // The token goes into an httpOnly cookie and deliberately NOT into the
+  // response body. A value the page's own JavaScript can read is a value an
+  // XSS can read, which is the whole reason for moving off localStorage.
+  // passthrough:true lets Nest keep serialising the returned object.
+  private startSession(res: Response, result: SessionResult) {
+    res.cookie(
+      AUTH_COOKIE,
+      result.accessToken,
+      authCookieOptions(this.isProduction),
+    );
+    return { user: result.user };
+  }
 
   @Post('register')
-  async register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto);
+  async register(
+    @Body() dto: RegisterDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return this.startSession(res, await this.authService.register(dto));
   }
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  async login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  async login(
+    @Body() dto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return this.startSession(res, await this.authService.login(dto));
+  }
+
+  // Unguarded on purpose. Signing out has to work when the token is already
+  // expired or malformed — that is exactly when a user wants to clear it, and
+  // a guard here would answer 401 and leave the cookie in place.
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  logout(@Res({ passthrough: true }) res: Response) {
+    res.clearCookie(AUTH_COOKIE, clearAuthCookieOptions(this.isProduction));
+    return { message: 'Signed out' };
   }
 
   // GET, because this is the target of a link in an email — the user clicks it

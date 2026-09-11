@@ -1,0 +1,788 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Booking flow — step by step</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Serif:wght@600&display=swap">
+<style>
+  :root{
+    --paper:#EFF2F5; --surface:#FFFFFF; --surface-2:#F7F9FB;
+    --ink:#131C26; --ink-soft:#54636F; --rule:#D2D9E0;
+    --rust:#A62F1E; --rust-wash:#FAEDEA;
+    --pine:#1C6B58; --pine-wash:#E5F3EF;
+    --slate:#2F5D8C; --slate-wash:#E8EFF7;
+    --ochre:#8A6A12; --ochre-wash:#FBF4DF;
+    --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+    --serif:"IBM Plex Serif",Georgia,serif;
+  }
+  body{background:var(--paper);color:var(--ink);margin:0;padding:32px 24px 40px;font-family:var(--mono)}
+  .sheet{max-width:960px;margin:0 auto 26px;background:var(--surface);border:1px solid var(--rule);padding:26px 20px 30px}
+  h1{font-family:var(--serif);font-weight:600;font-size:25px;margin:0 0 4px;text-align:center}
+  h2{font-family:var(--serif);font-weight:600;font-size:19px;margin:0 0 8px}
+  .sub{text-align:center;font-size:11.5px;color:var(--ink-soft);letter-spacing:.1em;margin:0 0 24px}
+  .step{font-size:11px;letter-spacing:.16em;color:var(--ink-soft);margin:0 0 5px}
+  .note{font-size:12.5px;line-height:1.7;margin:0 0 18px;max-width:76ch}
+  .note + .note{margin-top:-8px}
+  .note code{background:var(--surface-2);border:1px solid var(--rule);padding:1px 4px;font-size:11.5px}
+  .warn{border-left:3px solid var(--ochre);background:var(--ochre-wash);padding:10px 14px;margin:14px 0 18px;font-size:12.5px;line-height:1.7;max-width:76ch}
+  .warn b{color:var(--ochre)}
+  .toc{font-size:12.5px;line-height:2}
+  .toc a{color:var(--slate);text-decoration:none;border-bottom:1px solid var(--rule)}
+  .toc a:hover{border-bottom-color:var(--slate)}
+  .toc span{color:var(--ink-soft);display:inline-block;width:34px}
+  svg{display:block;width:100%;height:auto}
+  .b{fill:var(--surface-2);stroke:var(--rule);stroke-width:1.2}
+  .b-q{fill:var(--surface-2);stroke:var(--ink-soft);stroke-width:1.4}
+  .b-ok{fill:var(--pine-wash);stroke:var(--pine);stroke-width:1.8}
+  .b-no{fill:var(--rust-wash);stroke:var(--rust);stroke-width:1.8}
+  .b-sl{fill:var(--slate-wash);stroke:var(--slate);stroke-width:1.6}
+  .b-oc{fill:var(--ochre-wash);stroke:var(--ochre);stroke-width:1.6}
+  .hd{fill:var(--surface-2);stroke:var(--rule);stroke-width:1}
+  .grp{fill:none;stroke:var(--ink-soft);stroke-width:1.3;stroke-dasharray:5 4}
+  .t{font-family:var(--mono);font-size:13px;fill:var(--ink)}
+  .t.s{font-size:11px}
+  .t.xs{font-size:10px}
+  .t.m{fill:var(--ink-soft)}
+  .t.g{fill:var(--pine);font-weight:500}
+  .t.r{fill:var(--rust);font-weight:500}
+  .t.sl{fill:var(--slate);font-weight:500}
+  .t.o{fill:var(--ochre);font-weight:500}
+  .lbl{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.16em;fill:var(--ink-soft)}
+  .ln{fill:none;stroke:var(--ink-soft);stroke-width:1.4}
+  .ln.g{stroke:var(--pine)}
+  .ln.r{stroke:var(--rust)}
+  .ln.sl{stroke:var(--slate)}
+  .ln.d{stroke-dasharray:5 4}
+  .grid{fill:none;stroke:var(--rule);stroke-width:1}
+  .tick{fill:none;stroke:var(--ink-soft);stroke-width:1;stroke-dasharray:3 3}
+</style>
+</head>
+<body>
+
+<div class="sheet">
+  <h1>Booking flow — step by step</h1>
+  <p class="sub">HOTEL-BOOKING-APP &nbsp;·&nbsp; PROPOSED DESIGN &nbsp;·&nbsp; NOT YET IMPLEMENTED</p>
+  <p class="note">
+    Seven steps, each with the diagram and what it is actually doing. Companion to
+    <code>BOOKING-DESIGN.md</code>, which carries the field-level detail. Read in order —
+    steps 2 to 4 build the availability rule, and step 6 will not make sense without step 5.
+  </p>
+  <div class="toc">
+    <span>01</span> <a href="#s1">The entity model — what owns what</a><br>
+    <span>02</span> <a href="#s2">Half-open dates — why back-to-back stays don't collide</a><br>
+    <span>03</span> <a href="#s3">Why subtracting the overlaps is wrong</a><br>
+    <span>04</span> <a href="#s4">The sweep line — computing peak occupancy</a><br>
+    <span>05</span> <a href="#s5">POST /bookings — the full request pipeline</a><br>
+    <span>06</span> <a href="#s6">The overbooking race, and why a transaction alone loses it</a><br>
+    <span>07</span> <a href="#s7">Cancellation — inventory returns by itself</a>
+  </div>
+</div>
+
+<!-- ══════════════════════════ 1 ══════════════════════════ -->
+<div class="sheet" id="s1">
+  <p class="step">STEP 01</p>
+  <h2>The entity model — what owns what</h2>
+  <p class="note">
+    Four documents. A <code>Hotel</code> owns many <code>RoomType</code>s; a room type owns many
+    <code>Booking</code>s; a <code>User</code> holds many bookings. The load-bearing field is
+    <code>RoomType.totalUnits</code> — the <em>allotment</em>. You are not selling room 237, you are
+    selling one of the twelve Deluxe Doubles, and which physical room the guest gets is decided
+    at check-in or never.
+  </p>
+  <p class="note">
+    <code>Booking</code> denormalises <code>hotel</code> even though it could be reached through
+    <code>roomType</code>, so "every booking at this hotel" is one indexed query instead of a join.
+    And <code>pricing</code> is a <em>snapshot</em>, not a reference: it copies the rate, currency
+    and night count at the moment of booking, so raising the room rate next week cannot silently
+    re-price a reservation someone already holds.
+  </p>
+
+  <svg viewBox="0 0 900 545" role="img"
+       aria-label="Entity diagram. Hotel has a one-to-many relationship to RoomType, which has a one-to-many relationship to Booking. User has a one-to-many relationship to Booking. RoomType carries totalUnits, the allotment. Booking carries a pricing snapshot.">
+    <defs>
+      <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse">
+        <path d="M0,1 L9,5 L0,9 z" fill="#54636F"/>
+      </marker>
+    </defs>
+
+    <!-- Hotel -->
+    <rect class="b" x="30" y="60" width="200" height="185"/>
+    <rect class="hd" x="30" y="60" width="200" height="30"/>
+    <text class="t"    x="130" y="81"  text-anchor="middle">Hotel</text>
+    <text class="t s m" x="46" y="116">name</text>
+    <text class="t s m" x="46" y="139">address { city, country }</text>
+    <text class="t s"   x="46" y="162">timezone</text>
+    <text class="t s m" x="46" y="185">checkInTime / checkOutTime</text>
+    <text class="t s m" x="46" y="208">isActive</text>
+    <text class="t xs m" x="46" y="231">soft-deleted, never dropped</text>
+
+    <!-- RoomType -->
+    <rect class="b" x="290" y="60" width="215" height="230"/>
+    <rect class="hd" x="290" y="60" width="215" height="30"/>
+    <text class="t"    x="397" y="81"  text-anchor="middle">RoomType</text>
+    <text class="t s m" x="306" y="116">hotel &#8594;</text>
+    <text class="t s m" x="306" y="139">name</text>
+    <text class="t s"   x="306" y="162">basePricePerNight</text>
+    <text class="t xs m" x="306" y="181">integer, minor units</text>
+    <text class="t s m" x="306" y="204">currency · maxOccupancy</text>
+    <text class="t sl"   x="306" y="230">totalUnits</text>
+    <text class="t xs sl" x="306" y="249">&#9664; the allotment</text>
+    <text class="t s m" x="306" y="274">isActive</text>
+
+    <!-- Booking -->
+    <rect class="b-sl" x="565" y="60" width="305" height="285"/>
+    <rect class="hd" x="565" y="60" width="305" height="30"/>
+    <text class="t"    x="717" y="81"  text-anchor="middle">Booking</text>
+    <text class="t s m" x="581" y="116">reference &nbsp;HB-7K2M9Q</text>
+    <text class="t s m" x="581" y="139">user &#8594; &nbsp; hotel &#8594; &nbsp; roomType &#8594;</text>
+    <text class="t s"   x="581" y="164">checkIn / checkOut</text>
+    <text class="t xs m" x="581" y="183">UTC midnight, half-open</text>
+    <text class="t s m" x="581" y="206">unitsBooked · guests { }</text>
+    <text class="t s"   x="581" y="231">pricing { rate, nights, total }</text>
+    <text class="t xs m" x="581" y="250">snapshot — never recomputed</text>
+    <text class="t s m" x="581" y="273">status</text>
+    <text class="t xs m" x="581" y="292">pending·confirmed·cancelled·completed</text>
+    <text class="t s m" x="581" y="315">paymentStatus</text>
+    <text class="t xs m" x="581" y="334">unpaid — no gateway this phase</text>
+
+    <!-- User -->
+    <rect class="b" x="565" y="410" width="305" height="110"/>
+    <rect class="hd" x="565" y="410" width="305" height="30"/>
+    <text class="t"    x="717" y="431" text-anchor="middle">User</text>
+    <text class="t s m" x="581" y="466">name · email · role</text>
+    <text class="t s"   x="581" y="491">isEmailVerified</text>
+    <text class="t xs o" x="581" y="510">set today, enforced nowhere — step 05 fixes that</text>
+
+    <!-- arrows -->
+    <path class="ln" d="M230,152 H285" marker-end="url(#a1)"/>
+    <text class="t xs m" x="240" y="144">1:N</text>
+    <path class="ln" d="M505,152 H560" marker-end="url(#a1)"/>
+    <text class="t xs m" x="515" y="144">1:N</text>
+    <path class="ln" d="M717,410 V350" marker-end="url(#a1)"/>
+    <text class="t xs m" x="727" y="384">N:1</text>
+
+    <text class="t s m" x="30" y="330">availability is a question about</text>
+    <text class="t s m" x="30" y="350">RoomType.totalUnits minus the</text>
+    <text class="t s m" x="30" y="370">Bookings that sit across the</text>
+    <text class="t s m" x="30" y="390">requested nights — steps 02–04</text>
+    <path class="ln d" d="M30,404 H250 V250" marker-end="url(#a1)"/>
+  </svg>
+</div>
+
+<!-- ══════════════════════════ 2 ══════════════════════════ -->
+<div class="sheet" id="s2">
+  <p class="step">STEP 02</p>
+  <h2>Half-open dates — why back-to-back stays don't collide</h2>
+  <p class="note">
+    A hotel stay is a run of <em>nights</em>, not a span of time. <code>Jun 1 &#8594; Jun 3</code> is
+    two nights — the night of Jun 1 and the night of Jun 2 — and the guest is gone by the morning
+    of Jun 3. So the interval is <b>half-open</b>: <code>[checkIn, checkOut)</code>. The checkout
+    date is a boundary, not an occupied night.
+  </p>
+  <p class="note">
+    That is what makes the overlap test strict on both sides. Two stays collide only if each one
+    starts before the other ends, and a stay checking out on Jun 3 does not block a stay checking
+    in on Jun 3 — they merely touch.
+  </p>
+
+  <svg viewBox="0 0 900 520" role="img"
+       aria-label="Timeline from June 1 to June 6 divided into nights. Booking A spans June 1 to June 3, occupying the nights of June 1 and June 2. Booking B spans June 3 to June 5, occupying the nights of June 3 and June 4. They touch at June 3 but do not overlap. The overlap predicate requires strict less-than on both comparisons.">
+    <defs>
+      <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,1 L9,5 L0,9 z" fill="#54636F"/>
+      </marker>
+    </defs>
+
+    <!-- date labels -->
+    <text class="t s m" x="120" y="48" text-anchor="middle">Jun 1</text>
+    <text class="t s m" x="260" y="48" text-anchor="middle">Jun 2</text>
+    <text class="t r"   x="400" y="48" text-anchor="middle">Jun 3</text>
+    <text class="t s m" x="540" y="48" text-anchor="middle">Jun 4</text>
+    <text class="t s m" x="680" y="48" text-anchor="middle">Jun 5</text>
+    <text class="t s m" x="820" y="48" text-anchor="middle">Jun 6</text>
+
+    <!-- boundary ticks -->
+    <path class="tick" d="M120,58 V300"/>
+    <path class="tick" d="M260,58 V300"/>
+    <path class="ln"   d="M400,58 V300"/>
+    <path class="tick" d="M540,58 V300"/>
+    <path class="tick" d="M680,58 V300"/>
+    <path class="tick" d="M820,58 V300"/>
+
+    <!-- booking A -->
+    <rect class="b-ok" x="120" y="78" width="280" height="46"/>
+    <text class="t g"   x="260" y="99"  text-anchor="middle">Booking A</text>
+    <text class="t xs m" x="260" y="115" text-anchor="middle">checkIn Jun 1 · checkOut Jun 3 · 2 nights</text>
+
+    <!-- booking B -->
+    <rect class="b-sl" x="400" y="140" width="280" height="46"/>
+    <text class="t sl"   x="540" y="161" text-anchor="middle">Booking B</text>
+    <text class="t xs m" x="540" y="177" text-anchor="middle">checkIn Jun 3 · checkOut Jun 5 · 2 nights</text>
+
+    <!-- night cells -->
+    <text class="t xs m" x="190" y="228" text-anchor="middle">night of Jun 1</text>
+    <text class="t xs m" x="330" y="228" text-anchor="middle">night of Jun 2</text>
+    <text class="t xs m" x="470" y="228" text-anchor="middle">night of Jun 3</text>
+    <text class="t xs m" x="610" y="228" text-anchor="middle">night of Jun 4</text>
+    <text class="t xs m" x="750" y="228" text-anchor="middle">night of Jun 5</text>
+    <text class="t xs g" x="190" y="246" text-anchor="middle">A</text>
+    <text class="t xs g" x="330" y="246" text-anchor="middle">A</text>
+    <text class="t xs sl" x="470" y="246" text-anchor="middle">B</text>
+    <text class="t xs sl" x="610" y="246" text-anchor="middle">B</text>
+    <text class="t xs m" x="750" y="246" text-anchor="middle">free</text>
+
+    <!-- the seam -->
+    <path class="ln g" d="M350,278 H396" marker-end="url(#a2)"/>
+    <text class="t xs g" x="156" y="282">A vacates the morning of Jun 3</text>
+    <path class="ln sl" d="M440,278 H404" marker-end="url(#a2)"/>
+    <text class="t xs sl" x="450" y="282">B arrives Jun 3 — same day, no clash</text>
+
+    <!-- predicate panel -->
+    <text class="lbl" x="40" y="336">THE OVERLAP PREDICATE</text>
+    <path class="grid" d="M300,331 H860"/>
+
+    <rect class="b" x="40" y="352" width="820" height="58"/>
+    <text class="t" x="60" y="387">overlaps &nbsp;=&nbsp; a.checkIn &lt; b.checkOut &nbsp;&amp;&amp;&nbsp; b.checkIn &lt; a.checkOut</text>
+
+    <rect class="b-ok" x="40" y="424" width="400" height="76"/>
+    <text class="t s g"  x="58" y="448">strict &lt; — correct</text>
+    <text class="t s m"  x="58" y="470">Jun 1 &lt; Jun 5 &nbsp;true</text>
+    <text class="t s m"  x="58" y="490">Jun 3 &lt; Jun 3 &nbsp;false &nbsp;&#8594;&nbsp; no overlap</text>
+
+    <rect class="b-no" x="460" y="424" width="400" height="76"/>
+    <text class="t s r"  x="478" y="448">&#8804; — the bug</text>
+    <text class="t s m"  x="478" y="470">Jun 3 &#8804; Jun 3 &nbsp;true &nbsp;&#8594;&nbsp; phantom conflict</text>
+    <text class="t s m"  x="478" y="490">room reads as full on every touching date</text>
+  </svg>
+
+  <div class="warn">
+    <b>Worth guarding with a test.</b> A <code>&#8804;</code> on either side of that predicate is the
+    single most likely bug in this module. It never fails on random dates — only on stays that
+    touch — so it survives casual testing and then rejects real guests at the seam between two
+    reservations.
+  </div>
+</div>
+
+<!-- ══════════════════════════ 3 ══════════════════════════ -->
+<div class="sheet" id="s3">
+  <p class="step">STEP 03</p>
+  <h2>Why subtracting the overlaps is wrong</h2>
+  <p class="note">
+    The obvious way to answer "is there a room free?" is to take the allotment and subtract every
+    booking that overlaps the requested dates. It is wrong, and it fails in the direction that
+    loses you money: it <em>rejects stays that are perfectly bookable</em>.
+  </p>
+  <p class="note">
+    Here is the smallest case that breaks it. A room type with two units, one booking on the night
+    of Jun 1, another on the night of Jun 3, and a guest asking for Jun 1 &#8594; Jun 4. Both
+    bookings overlap the request, so the sum is 2, and <code>2 &minus; 2 = 0</code>. But look at the
+    nights: not one of them is full.
+  </p>
+
+  <svg viewBox="0 0 900 625" role="img"
+       aria-label="Counter-example. Room type with two units. Booking A occupies the night of June 1, booking B the night of June 3. A request for June 1 to June 4 overlaps both. Summing the overlapping bookings gives 2 and wrongly reports zero availability. A per-night occupancy chart shows one unit free on June 1, two free on June 2, and one free on June 3, so the maximum occupancy on any night is 1 and one unit is genuinely available.">
+    <defs>
+      <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,1 L9,5 L0,9 z" fill="#54636F"/>
+      </marker>
+    </defs>
+
+    <text class="t s m" x="40" y="44">RoomType &ldquo;Deluxe Double&rdquo; &nbsp;·&nbsp; totalUnits 2</text>
+
+    <text class="t s m" x="160" y="76" text-anchor="middle">Jun 1</text>
+    <text class="t s m" x="360" y="76" text-anchor="middle">Jun 2</text>
+    <text class="t s m" x="560" y="76" text-anchor="middle">Jun 3</text>
+    <text class="t s m" x="760" y="76" text-anchor="middle">Jun 4</text>
+    <path class="tick" d="M160,86 V300"/>
+    <path class="tick" d="M360,86 V300"/>
+    <path class="tick" d="M560,86 V300"/>
+    <path class="tick" d="M760,86 V300"/>
+
+    <rect class="b-ok" x="160" y="98" width="200" height="40"/>
+    <text class="t s g" x="260" y="123" text-anchor="middle">Booking A &nbsp;1 unit</text>
+
+    <rect class="b-sl" x="560" y="150" width="200" height="40"/>
+    <text class="t s sl" x="660" y="175" text-anchor="middle">Booking B &nbsp;1 unit</text>
+
+    <rect class="b" x="160" y="202" width="600" height="40" stroke-dasharray="5 4"/>
+    <text class="t s" x="460" y="227" text-anchor="middle">the request &nbsp;Jun 1 &#8594; Jun 4 &nbsp;·&nbsp; 1 unit &nbsp;·&nbsp; 3 nights</text>
+
+    <text class="t xs m" x="260" y="268" text-anchor="middle">night of Jun 1</text>
+    <text class="t xs m" x="460" y="268" text-anchor="middle">night of Jun 2</text>
+    <text class="t xs m" x="660" y="268" text-anchor="middle">night of Jun 3</text>
+
+    <!-- occupancy chart -->
+    <text class="lbl" x="40" y="318">OCCUPANCY, NIGHT BY NIGHT</text>
+    <path class="grid" d="M330,313 H860"/>
+
+    <path class="grid" d="M180,340 H740"/>
+    <path class="grid" d="M180,390 H740"/>
+    <path class="grid" d="M180,440 H740"/>
+    <text class="t xs m" x="130" y="344" text-anchor="end">2</text>
+    <text class="t xs m" x="130" y="394" text-anchor="end">1</text>
+    <text class="t xs m" x="130" y="444" text-anchor="end">0</text>
+    <text class="t xs m" x="40"  y="370">units</text>
+
+    <!-- Jun 1: 1 occupied -->
+    <rect class="b"    x="200" y="340" width="120" height="50"/>
+    <rect class="b-ok" x="200" y="390" width="120" height="50"/>
+    <text class="t xs m" x="260" y="370" text-anchor="middle">free</text>
+    <text class="t xs g" x="260" y="420" text-anchor="middle">A</text>
+
+    <!-- Jun 2: 0 occupied -->
+    <rect class="b" x="400" y="340" width="120" height="100"/>
+    <text class="t xs m" x="460" y="395" text-anchor="middle">free &#215; 2</text>
+
+    <!-- Jun 3: 1 occupied -->
+    <rect class="b"    x="600" y="340" width="120" height="50"/>
+    <rect class="b-sl" x="600" y="390" width="120" height="50"/>
+    <text class="t xs m" x="660" y="370" text-anchor="middle">free</text>
+    <text class="t xs sl" x="660" y="420" text-anchor="middle">B</text>
+
+    <text class="t s g" x="260" y="466" text-anchor="middle">1 free</text>
+    <text class="t s g" x="460" y="466" text-anchor="middle">2 free</text>
+    <text class="t s g" x="660" y="466" text-anchor="middle">1 free</text>
+
+    <!-- verdicts -->
+    <rect class="b-no" x="40" y="496" width="400" height="106"/>
+    <text class="t r"    x="58" y="522">SUM &nbsp;&#8212;&nbsp; wrong</text>
+    <text class="t s m"  x="58" y="548">total &minus; SUM(overlapping)</text>
+    <text class="t s m"  x="58" y="570">2 &minus; (1 + 1) = 0</text>
+    <text class="t s r"  x="58" y="592">REJECTED &nbsp;&#8212;&nbsp; a sale thrown away</text>
+
+    <rect class="b-ok" x="460" y="496" width="400" height="106"/>
+    <text class="t g"    x="478" y="522">MAX &nbsp;&#8212;&nbsp; correct</text>
+    <text class="t s m"  x="478" y="548">total &minus; MAX(occupied per night)</text>
+    <text class="t s m"  x="478" y="570">2 &minus; max(1, 0, 1) = 1</text>
+    <text class="t s g"  x="478" y="592">ACCEPTED &nbsp;&#8212;&nbsp; a unit really is free</text>
+  </svg>
+
+  <p class="note">
+    The fix is to stop treating occupancy as something you add up across a range. Occupancy is a
+    <em>per-night</em> quantity, and what constrains a stay is its <b>worst night</b>:
+  </p>
+  <p class="note">
+    <code>available = totalUnits &minus; MAX over each night in [checkIn, checkOut) of occupied(night)</code>
+  </p>
+</div>
+
+<!-- ══════════════════════════ 4 ══════════════════════════ -->
+<div class="sheet" id="s4">
+  <p class="step">STEP 04</p>
+  <h2>The sweep line — computing peak occupancy</h2>
+  <p class="note">
+    Taking the maximum over every night sounds like it needs one row per night. It doesn't.
+    Occupancy only changes at a check-in or a check-out, so you sweep the boundaries: emit a
+    <code>+units</code> event at each arrival and a <code>&minus;units</code> at each departure,
+    sort, and walk them keeping a running total. The highest value that total reaches is the peak.
+    Five steps, and the cost is the number of overlapping bookings — not the length of the stay.
+  </p>
+
+  <svg viewBox="0 0 900 470" role="img"
+       aria-label="Five-step sweep line algorithm on the left: fetch overlapping bookings, emit plus and minus events, sort with departures before arrivals at equal dates, walk tracking a running peak, and subtract the peak from totalUnits. On the right, a worked example showing that processing arrivals before departures at a shared date produces a nonsensical negative availability, while processing departures first produces the correct answer.">
+    <defs>
+      <marker id="a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,1 L9,5 L0,9 z" fill="#54636F"/>
+      </marker>
+    </defs>
+
+    <text class="lbl" x="40" y="40">THE ALGORITHM</text>
+
+    <rect class="b" x="40" y="56" width="370" height="52"/>
+    <text class="t s"   x="56" y="79">1 &nbsp; fetch overlapping bookings</text>
+    <text class="t xs m" x="56" y="97">status IN (pending, confirmed) — cancelled ones ignored</text>
+    <path class="ln" d="M225,108 V126" marker-end="url(#a4)"/>
+
+    <rect class="b" x="40" y="132" width="370" height="52"/>
+    <text class="t s"   x="56" y="155">2 &nbsp; emit events, clamped to the window</text>
+    <text class="t xs m" x="56" y="173">+units at checkIn &nbsp;·&nbsp; &minus;units at checkOut</text>
+    <path class="ln" d="M225,184 V202" marker-end="url(#a4)"/>
+
+    <rect class="b-oc" x="40" y="208" width="370" height="52"/>
+    <text class="t s o"  x="56" y="231">3 &nbsp; sort by date &#8212; &minus; before + on ties</text>
+    <text class="t xs m" x="56" y="249">this line is load-bearing, see right</text>
+    <path class="ln" d="M225,260 V278" marker-end="url(#a4)"/>
+
+    <rect class="b" x="40" y="284" width="370" height="52"/>
+    <text class="t s"   x="56" y="307">4 &nbsp; walk, tracking running total</text>
+    <text class="t xs m" x="56" y="325">keep the highest value it reaches = peak</text>
+    <path class="ln" d="M225,336 V354" marker-end="url(#a4)"/>
+
+    <rect class="b-ok" x="40" y="360" width="370" height="52"/>
+    <text class="t g"   x="56" y="383">5 &nbsp; available = totalUnits &minus; peak</text>
+    <text class="t xs m" x="56" y="401">pure function — no Mongoose, exhaustively testable</text>
+
+    <text class="t xs m" x="40" y="440">src/booking/availability.ts</text>
+    <text class="t xs m" x="40" y="457">same shape as the existing auth/reset-token.ts</text>
+
+    <!-- worked example -->
+    <text class="lbl" x="450" y="40">WHY THE TIE-BREAK MATTERS</text>
+    <text class="t xs m" x="450" y="60">totalUnits 1 &nbsp;·&nbsp; A Jun 1&#8594;Jun 3 &nbsp;·&nbsp; B Jun 3&#8594;Jun 5</text>
+
+    <rect class="b-no" x="450" y="76" width="410" height="164"/>
+    <text class="t r"    x="468" y="100">arrivals first &#8212; nonsense</text>
+    <text class="t s m"  x="468" y="128">Jun 1 &nbsp; +1 &nbsp;&#8594;&nbsp; 1</text>
+    <text class="t s r"  x="468" y="150">Jun 3 &nbsp; +1 &nbsp;&#8594;&nbsp; 2 &nbsp;&#9664; peak 2</text>
+    <text class="t s m"  x="468" y="172">Jun 3 &nbsp; &minus;1 &nbsp;&#8594;&nbsp; 1</text>
+    <text class="t s m"  x="468" y="194">Jun 5 &nbsp; &minus;1 &nbsp;&#8594;&nbsp; 0</text>
+    <text class="t s r"  x="468" y="224">available = 1 &minus; 2 = &minus;1 &nbsp;&#8212; impossible</text>
+
+    <rect class="b-ok" x="450" y="256" width="410" height="164"/>
+    <text class="t g"    x="468" y="280">departures first &#8212; correct</text>
+    <text class="t s m"  x="468" y="308">Jun 1 &nbsp; +1 &nbsp;&#8594;&nbsp; 1</text>
+    <text class="t s m"  x="468" y="330">Jun 3 &nbsp; &minus;1 &nbsp;&#8594;&nbsp; 0</text>
+    <text class="t s g"  x="468" y="352">Jun 3 &nbsp; +1 &nbsp;&#8594;&nbsp; 1 &nbsp;&#9664; peak 1</text>
+    <text class="t s m"  x="468" y="374">Jun 5 &nbsp; &minus;1 &nbsp;&#8594;&nbsp; 0</text>
+    <text class="t s g"  x="468" y="404">available = 1 &minus; 1 = 0 &nbsp;&#8212; correctly full</text>
+  </svg>
+
+  <div class="warn">
+    <b>The tie-break is not cosmetic.</b> A and B are a legal back-to-back pair — the room is
+    occupied every night, but never twice. Process the arrival before the departure and the
+    running total spikes to 2 for an instant that does not exist in reality, and the sweep reports
+    negative availability for a room type that is merely full.
+  </div>
+</div>
+
+<!-- ══════════════════════════ 5 ══════════════════════════ -->
+<div class="sheet" id="s5">
+  <p class="step">STEP 05</p>
+  <h2>POST /bookings — the full request pipeline</h2>
+  <p class="note">
+    Everything above becomes one request. The guard chain runs first and cheapest, then the stay
+    rules, then the part that has to be atomic. Note the third guard:
+    <code>EmailVerifiedGuard</code> is new, and it closes a gap that exists in the codebase today —
+    <code>isEmailVerified</code> is currently written at sign-up and then never consulted anywhere.
+    A booking is the right place to start demanding it, because a confirmation sent to an
+    unverified address goes nowhere, and a reservation the guest cannot prove they hold is worse
+    than a refusal.
+  </p>
+  <p class="note">
+    The guard reads the user record back rather than trusting the token: <code>AuthUser</code>
+    carries no verification claim, and a token signed before the user clicked the link would be
+    stale for up to a day.
+  </p>
+
+  <svg viewBox="0 0 900 1000" role="img"
+       aria-label="Vertical pipeline for POST /bookings. Request passes the global ValidationPipe (400 on failure), JwtAuthGuard (401), and EmailVerifiedGuard (403), reaches BookingService.create, loads and checks the room type and hotel (404), validates the stay rules (400), then enters a transaction which increments a counter on the room type, runs the availability sweep, rejects with 409 if insufficient, and inserts the booking before committing. Responds 201 and sends a confirmation email fire-and-forget.">
+    <defs>
+      <marker id="a5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,1 L9,5 L0,9 z" fill="#54636F"/>
+      </marker>
+      <marker id="a5r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,1 L9,5 L0,9 z" fill="#A62F1E"/>
+      </marker>
+      <marker id="a5g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,1 L9,5 L0,9 z" fill="#1C6B58"/>
+      </marker>
+    </defs>
+
+    <!-- 1 request -->
+    <rect class="b-sl" x="210" y="50" width="390" height="44"/>
+    <text class="t sl"    x="405" y="70" text-anchor="middle">POST /bookings</text>
+    <text class="t xs m" x="405" y="87" text-anchor="middle">{ roomTypeId, checkIn, checkOut, units, guests }</text>
+    <path class="ln" d="M405,94 V116" marker-end="url(#a5)"/>
+
+    <!-- 2 validation -->
+    <rect class="b" x="210" y="120" width="390" height="44"/>
+    <text class="t s"    x="226" y="140">global ValidationPipe</text>
+    <text class="t xs m" x="226" y="157">whitelist strips a client-sent price</text>
+    <path class="ln" d="M405,164 V186" marker-end="url(#a5)"/>
+    <path class="ln r" d="M600,142 H645" marker-end="url(#a5r)"/>
+    <rect class="b-no" x="650" y="122" width="215" height="40"/>
+    <text class="t s r"  x="664" y="140">400 Bad Request</text>
+    <text class="t xs m" x="664" y="155">DTO failed validation</text>
+
+    <!-- 3 jwt -->
+    <rect class="b" x="210" y="190" width="390" height="44"/>
+    <text class="t s"    x="226" y="210">JwtAuthGuard</text>
+    <text class="t xs m" x="226" y="227">verifies bearer token against AUTH_SECRET</text>
+    <path class="ln" d="M405,234 V256" marker-end="url(#a5)"/>
+    <path class="ln r" d="M600,212 H645" marker-end="url(#a5r)"/>
+    <rect class="b-no" x="650" y="192" width="215" height="40"/>
+    <text class="t s r"  x="664" y="210">401 Unauthorized</text>
+    <text class="t xs m" x="664" y="225">missing or expired token</text>
+
+    <!-- 4 email verified -->
+    <rect class="b-oc" x="210" y="260" width="390" height="44"/>
+    <text class="t s o"  x="226" y="280">EmailVerifiedGuard &nbsp;&#9733; new</text>
+    <text class="t xs m" x="226" y="297">re-reads the record — the token has no such claim</text>
+    <path class="ln" d="M405,304 V326" marker-end="url(#a5)"/>
+    <path class="ln r" d="M600,282 H645" marker-end="url(#a5r)"/>
+    <rect class="b-no" x="650" y="262" width="215" height="40"/>
+    <text class="t s r"  x="664" y="280">403 Forbidden</text>
+    <text class="t xs m" x="664" y="295">email not verified</text>
+
+    <!-- 5 service -->
+    <rect class="b" x="210" y="330" width="390" height="44"/>
+    <text class="t s"    x="226" y="350">BookingService.create()</text>
+    <text class="t xs m" x="226" y="367">actor id comes from the token, never the body</text>
+    <path class="ln" d="M405,374 V396" marker-end="url(#a5)"/>
+
+    <!-- 6 load -->
+    <rect class="b" x="210" y="400" width="390" height="44"/>
+    <text class="t s"    x="226" y="420">load RoomType &#43; Hotel</text>
+    <text class="t xs m" x="226" y="437">both must be isActive — delisted stock is unbookable</text>
+    <path class="ln" d="M405,444 V466" marker-end="url(#a5)"/>
+    <path class="ln r" d="M600,422 H645" marker-end="url(#a5r)"/>
+    <rect class="b-no" x="650" y="402" width="215" height="40"/>
+    <text class="t s r"  x="664" y="420">404 Not Found</text>
+    <text class="t xs m" x="664" y="435">missing or inactive</text>
+
+    <!-- 7 rules -->
+    <rect class="b" x="210" y="470" width="390" height="44"/>
+    <text class="t s"    x="226" y="490">validate the stay</text>
+    <text class="t xs m" x="226" y="507">dates · max stay · occupancy · not in the past</text>
+    <path class="ln" d="M405,514 V540" marker-end="url(#a5)"/>
+    <path class="ln r" d="M600,492 H645" marker-end="url(#a5r)"/>
+    <rect class="b-no" x="650" y="472" width="215" height="40"/>
+    <text class="t s r"  x="664" y="490">400 Bad Request</text>
+    <text class="t xs m" x="664" y="505">a stay rule failed</text>
+
+    <!-- transaction group -->
+    <rect class="grp" x="185" y="544" width="440" height="266"/>
+    <text class="lbl" x="200" y="566">BEGIN TRANSACTION</text>
+
+    <rect class="b-oc" x="210" y="578" width="390" height="46"/>
+    <text class="t s o"  x="226" y="599">$inc RoomType.bookingSeq</text>
+    <text class="t xs m" x="226" y="616">manufactures the write conflict — step 06</text>
+    <path class="ln" d="M405,624 V640" marker-end="url(#a5)"/>
+
+    <rect class="b" x="210" y="644" width="390" height="56"/>
+    <text class="t s"    x="226" y="665">availability sweep &nbsp;·&nbsp; steps 02–04</text>
+    <text class="t xs m" x="226" y="682">available = totalUnits &minus; peak occupancy</text>
+    <text class="t xs m" x="226" y="696">available &#8805; unitsBooked ?</text>
+    <path class="ln" d="M405,700 V716" marker-end="url(#a5)"/>
+    <path class="ln r" d="M625,672 H645" marker-end="url(#a5r)"/>
+    <rect class="b-no" x="650" y="650" width="215" height="44"/>
+    <text class="t s r"  x="664" y="668">409 Conflict</text>
+    <text class="t xs m" x="664" y="683">no units free — abort</text>
+
+    <rect class="b" x="210" y="720" width="390" height="46"/>
+    <text class="t s"    x="226" y="741">insert Booking</text>
+    <text class="t xs m" x="226" y="758">status confirmed · price snapshot · reference</text>
+
+    <text class="lbl" x="200" y="792">COMMIT</text>
+
+    <path class="ln g" d="M405,810 V836" marker-end="url(#a5g)"/>
+
+    <!-- response -->
+    <rect class="b-ok" x="210" y="840" width="390" height="46"/>
+    <text class="t g"    x="226" y="861">201 Created</text>
+    <text class="t xs m" x="226" y="878">BookingResponseDto — reference, dates, total</text>
+    <path class="ln d" d="M405,886 V908" marker-end="url(#a5)"/>
+
+    <rect class="b" x="210" y="912" width="390" height="46"/>
+    <text class="t s"    x="226" y="933">sendBookingConfirmation()</text>
+    <text class="t xs m" x="226" y="950">fire-and-forget, failure logged only</text>
+
+    <text class="t xs m" x="40" y="930">the booking is already</text>
+    <text class="t xs m" x="40" y="946">committed — a dead SMTP</text>
+    <text class="t xs m" x="40" y="962">server must never undo it</text>
+  </svg>
+</div>
+
+<!-- ══════════════════════════ 6 ══════════════════════════ -->
+<div class="sheet" id="s6">
+  <p class="step">STEP 06</p>
+  <h2>The overbooking race, and why a transaction alone loses it</h2>
+  <p class="note">
+    Checking availability and then inserting is check-then-act, and two requests can interleave
+    between the two halves. The instinct is to wrap it in a transaction &mdash; and that instinct
+    is wrong here, which is the whole reason this step exists.
+  </p>
+  <p class="note">
+    MongoDB gives snapshot isolation, and a write conflict is raised when two transactions modify
+    <em>the same document</em>. Two bookings are two different documents. There is no shared row
+    for them to fight over, MongoDB has no range locks to notice that they both depend on a count
+    they each read, and overlap cannot be expressed as a unique index. Both transactions commit,
+    perfectly happily, and the room is sold twice.
+  </p>
+
+  <svg viewBox="0 0 900 690" role="img"
+       aria-label="Two interleaving scenarios. In the first, without a shared write, request A and request B both read one unit free and both insert a booking; the transaction detects nothing because the documents differ, and the room is overbooked. In the second, both requests first increment a counter on the same RoomType document; B takes a write conflict, retries, and on retry sees A's committed booking and correctly returns 409.">
+    <!-- panel 1 -->
+    <text class="lbl" x="40" y="34">WITHOUT A SHARED WRITE &#8212; THE RACE IS LOST</text>
+
+    <rect class="hd" x="40" y="48" width="270" height="28"/>
+    <rect class="hd" x="330" y="48" width="200" height="28"/>
+    <rect class="hd" x="550" y="48" width="310" height="28"/>
+    <text class="t xs m" x="52"  y="67">request A</text>
+    <text class="t xs m" x="342" y="67">database</text>
+    <text class="t xs m" x="562" y="67">request B</text>
+
+    <rect class="grid" x="40" y="76" width="270" height="46"/>
+    <rect class="grid" x="330" y="76" width="200" height="46"/>
+    <rect class="grid" x="550" y="76" width="310" height="46"/>
+    <text class="t s"   x="52"  y="104">sweep &#8594; 1 unit free</text>
+    <text class="t s m" x="342" y="104">1 free</text>
+
+    <rect class="grid" x="40" y="122" width="270" height="46"/>
+    <rect class="grid" x="330" y="122" width="200" height="46"/>
+    <rect class="grid" x="550" y="122" width="310" height="46"/>
+    <text class="t s m" x="342" y="150">1 free</text>
+    <text class="t s"   x="562" y="150">sweep &#8594; 1 unit free</text>
+
+    <rect class="grid" x="40" y="168" width="270" height="46"/>
+    <rect class="grid" x="330" y="168" width="200" height="46"/>
+    <rect class="grid" x="550" y="168" width="310" height="46"/>
+    <text class="t s"   x="52"  y="196">INSERT booking A · COMMIT</text>
+    <text class="t s m" x="342" y="196">1 booking</text>
+
+    <rect class="grid" x="40" y="214" width="270" height="46"/>
+    <rect class="b-no" x="330" y="214" width="200" height="46"/>
+    <rect class="grid" x="550" y="214" width="310" height="46"/>
+    <text class="t s r" x="342" y="242">2 bookings</text>
+    <text class="t s"   x="562" y="236">INSERT booking B · COMMIT</text>
+    <text class="t xs r" x="562" y="252">different document — no conflict raised</text>
+
+    <rect class="b-no" x="40" y="272" width="820" height="52"/>
+    <text class="t r"    x="58" y="294">one room, two guests</text>
+    <text class="t xs m" x="58" y="312">the transaction had nothing to detect — snapshot isolation only conflicts on the same document</text>
+
+    <!-- panel 2 -->
+    <text class="lbl" x="40" y="378">WITH $inc ON THE ROOMTYPE &#8212; THE RACE IS FORCED</text>
+
+    <rect class="hd" x="40" y="392" width="270" height="28"/>
+    <rect class="hd" x="330" y="392" width="200" height="28"/>
+    <rect class="hd" x="550" y="392" width="310" height="28"/>
+    <text class="t xs m" x="52"  y="411">request A</text>
+    <text class="t xs m" x="342" y="411">database</text>
+    <text class="t xs m" x="562" y="411">request B</text>
+
+    <rect class="b-ok" x="40" y="420" width="270" height="46"/>
+    <rect class="grid" x="330" y="420" width="200" height="46"/>
+    <rect class="grid" x="550" y="420" width="310" height="46"/>
+    <text class="t s g" x="52"  y="448">$inc roomType.bookingSeq</text>
+    <text class="t xs m" x="342" y="448">roomType held by A</text>
+
+    <rect class="grid" x="40" y="466" width="270" height="46"/>
+    <rect class="grid" x="330" y="466" width="200" height="46"/>
+    <rect class="b-oc" x="550" y="466" width="310" height="46"/>
+    <text class="t s"   x="52"  y="494">sweep &#8594; 1 unit free</text>
+    <text class="t s o" x="562" y="488">$inc the same document</text>
+    <text class="t xs o" x="562" y="504">WRITE CONFLICT &#8594; retry</text>
+
+    <rect class="grid" x="40" y="512" width="270" height="46"/>
+    <rect class="grid" x="330" y="512" width="200" height="46"/>
+    <rect class="grid" x="550" y="512" width="310" height="46"/>
+    <text class="t s"   x="52"  y="540">INSERT booking A · COMMIT</text>
+    <text class="t s m" x="342" y="540">1 booking</text>
+    <text class="t xs m" x="562" y="540">waiting</text>
+
+    <rect class="grid" x="40" y="558" width="270" height="46"/>
+    <rect class="grid" x="330" y="558" width="200" height="46"/>
+    <rect class="b-ok" x="550" y="558" width="310" height="46"/>
+    <text class="t s g" x="342" y="586">1 booking</text>
+    <text class="t s"   x="562" y="580">retry: sweep now sees A</text>
+    <text class="t xs g" x="562" y="596">0 free &#8594; 409 Conflict</text>
+
+    <rect class="b-ok" x="40" y="616" width="820" height="52"/>
+    <text class="t g"    x="58" y="638">one room, one guest</text>
+    <text class="t xs m" x="58" y="656">B is forced onto the same document as A, so it loses, retries, and the retry can finally see A's booking</text>
+  </svg>
+
+  <p class="note">
+    Bookings of <em>different</em> room types never touch the same counter, so they stay fully
+    parallel. Only concurrent attempts on the same room type serialise &mdash; which is exactly
+    the set that needed serialising.
+  </p>
+
+  <div class="warn">
+    <b>This needs a replica set.</b> Atlas is one, so deployment is fine. A standalone local
+    <code>mongod</code> throws on <code>startSession().withTransaction()</code>, and the failure
+    surfaces at booking time rather than at boot, which makes it confusing. Either run a
+    single-node replica set locally or point dev at Atlas &mdash; and say so in the README.
+  </div>
+</div>
+
+<!-- ══════════════════════════ 7 ══════════════════════════ -->
+<div class="sheet" id="s7">
+  <p class="step">STEP 07</p>
+  <h2>Cancellation — inventory returns by itself</h2>
+  <p class="note">
+    Cancelling flips a status and stamps an audit trail. It does <b>not</b> delete the row, and it
+    does not decrement anything. Both of those follow from the same design choice: bookings are
+    the single source of truth for occupancy, and the sweep in step 04 only counts bookings whose
+    status is <code>pending</code> or <code>confirmed</code>. A cancelled booking stops matching
+    that filter, so its nights simply stop producing events. There is no counter to keep in sync
+    and therefore no counter that can drift.
+  </p>
+  <p class="note">
+    The ownership test is the same rule <code>UsersController</code> already applies &mdash; admin,
+    or your own record. That is why the design pulls <code>assertCanActOn</code> out into
+    <code>src/auth/ownership.ts</code>: a duplicated authorisation check is how two copies quietly
+    stop agreeing.
+  </p>
+
+  <svg viewBox="0 0 900 665" role="img"
+       aria-label="Cancellation flow. PATCH to cancel passes JwtAuthGuard (401), then the shared ownership check (403), then a policy check that the booking is confirmed and check-in is still in the future (409, which admins bypass). It sets status to cancelled with audit fields, and returns 200 with a cancellation email. A panel explains that availability returns automatically because the sweep filters on status.">
+    <defs>
+      <marker id="a7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,1 L9,5 L0,9 z" fill="#54636F"/>
+      </marker>
+      <marker id="a7r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,1 L9,5 L0,9 z" fill="#A62F1E"/>
+      </marker>
+    </defs>
+
+    <rect class="b-sl" x="290" y="50" width="380" height="44"/>
+    <text class="t sl"    x="480" y="70" text-anchor="middle">PATCH /bookings/:id/cancel</text>
+    <text class="t xs m" x="480" y="87" text-anchor="middle">{ reason? }</text>
+    <path class="ln" d="M480,94 V118" marker-end="url(#a7)"/>
+
+    <rect class="b" x="290" y="122" width="380" height="44"/>
+    <text class="t s"    x="306" y="142">JwtAuthGuard</text>
+    <text class="t xs m" x="306" y="159">signed in is necessary, not sufficient</text>
+    <path class="ln" d="M480,166 V190" marker-end="url(#a7)"/>
+    <path class="ln r" d="M670,144 H695" marker-end="url(#a7r)"/>
+    <rect class="b-no" x="700" y="126" width="165" height="36"/>
+    <text class="t s r" x="712" y="144">401</text>
+    <text class="t xs m" x="712" y="158">no token</text>
+
+    <rect class="b-oc" x="290" y="194" width="380" height="52"/>
+    <text class="t s o"  x="306" y="214">assertCanActOn(booking.user, actor)</text>
+    <text class="t xs m" x="306" y="231">shared with UsersController — one copy only</text>
+    <path class="ln" d="M480,246 V270" marker-end="url(#a7)"/>
+    <path class="ln r" d="M670,220 H695" marker-end="url(#a7r)"/>
+    <rect class="b-no" x="700" y="202" width="165" height="36"/>
+    <text class="t s r"  x="712" y="219">403</text>
+    <text class="t xs m" x="712" y="233">not your booking</text>
+
+    <rect class="b-q" x="290" y="274" width="380" height="58"/>
+    <text class="t s"    x="306" y="294">status confirmed &amp; checkIn in future ?</text>
+    <text class="t xs m" x="306" y="311">admins bypass this — they cancel at any point</text>
+    <path class="ln" d="M480,332 V356" marker-end="url(#a7)"/>
+    <path class="ln r" d="M670,303 H695" marker-end="url(#a7r)"/>
+    <rect class="b-no" x="700" y="285" width="165" height="36"/>
+    <text class="t s r"  x="712" y="302">409</text>
+    <text class="t xs m" x="712" y="316">already cancelled</text>
+
+    <rect class="b" x="290" y="360" width="380" height="58"/>
+    <text class="t s"    x="306" y="380">status = 'cancelled'</text>
+    <text class="t xs m" x="306" y="398">cancelledAt · cancelledBy · cancellationReason</text>
+    <path class="ln" d="M480,418 V442" marker-end="url(#a7)"/>
+
+    <rect class="b-ok" x="290" y="446" width="380" height="46"/>
+    <text class="t g"    x="306" y="467">200 OK</text>
+    <text class="t xs m" x="306" y="484">&#43; sendBookingCancellation(), fire-and-forget</text>
+
+    <text class="t xs m" x="40" y="378">the row is never deleted —</text>
+    <text class="t xs m" x="40" y="394">a booking is a financial record,</text>
+    <text class="t xs m" x="40" y="410">and the audit trail is the answer</text>
+    <text class="t xs m" x="40" y="426">to &ldquo;why was I charged this?&rdquo;</text>
+    <path class="ln d" d="M245,390 H285" marker-end="url(#a7)"/>
+
+    <rect class="b-ok" x="40" y="524" width="820" height="112"/>
+    <text class="t g"    x="58" y="550">and the nights free themselves</text>
+    <text class="t s m"  x="58" y="578">the sweep fetches &nbsp;status IN (pending, confirmed)</text>
+    <text class="t s m"  x="58" y="600">a cancelled booking stops matching &#8594; it emits no events &#8594; peak occupancy drops</text>
+    <text class="t xs m" x="58" y="624">no counter to decrement, so no counter that can drift out of step with the bookings</text>
+  </svg>
+</div>
+
+</body>
+</html>
