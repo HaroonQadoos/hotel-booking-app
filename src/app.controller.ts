@@ -4,7 +4,10 @@ import { MailService } from './mail/mail.service';
 
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService, private readonly mailService: MailService) {}
+  constructor(
+    private readonly appService: AppService,
+    private readonly mailService: MailService,
+  ) {}
 
   @Get()
   getHello(): string {
@@ -12,7 +15,10 @@ export class AppController {
   }
   @Get('test-email')
   async testEmail() {
-    await this.mailService.sendVerificationEmail('test@example.com', 'fake-token-123');
+    await this.mailService.sendVerificationEmail(
+      'test@example.com',
+      'fake-token-123',
+    );
     return { message: 'Check your terminal for the preview link' };
   }
 }
