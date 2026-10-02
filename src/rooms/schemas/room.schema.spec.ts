@@ -38,4 +38,21 @@ describe('Room schema', () => {
     expect(RoomSchema.path('amenities').options.default).toEqual([]);
     expect(RoomSchema.path('images').options.default).toEqual([]);
   });
+
+  it('starts with no sale and caps the discount at 90%', () => {
+    const pct = RoomSchema.path('discountPercent').options;
+    expect(pct.default).toBe(0);
+    expect(pct.min).toBe(0);
+    expect(pct.max).toBe(90);
+  });
+
+  it.each(['discountStartsAt', 'discountEndsAt'])(
+    'stores %s as an optional date-only string',
+    (path) => {
+      const options = RoomSchema.path(path).options;
+      expect(options.type).toBe(String);
+      expect(options.default).toBeNull();
+      expect(options.match).toEqual(/^\d{4}-\d{2}-\d{2}$/);
+    },
+  );
 });

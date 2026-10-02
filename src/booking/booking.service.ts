@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, QueryFilter, Types } from 'mongoose';
+import { priceNights } from '../common/discount';
 import { RoomsService } from '../rooms/rooms.service';
 import { Room } from '../rooms/schemas/room.schema';
 import type { AuthUser } from '../auth/types/auth-user';
@@ -51,7 +52,12 @@ export class BookingService {
       checkIn: stay.checkIn,
       checkOut: stay.checkOut,
       guests: dto.guests,
-      totalPrice: stay.nights * room.pricePerNight,
+      totalPrice: priceNights(
+        room.pricePerNight,
+        room,
+        stay.checkIn,
+        stay.nights,
+      ),
       status: 'pending',
     });
 
@@ -111,13 +117,16 @@ export class BookingService {
   }
 
   // Guest-facing search: every active room type that fits the party, with
-  // how many units are free for the stay. Fully booked types are included
-  // with 0 so the client can show them as sold out rather than missing.
+  // how many units are free for the stay and what the stay would cost. Fully
+  // booked types are included with 0 so the client can show them as sold out
+  // rather than missing.
   async findAvailableRooms(
     checkInRaw: string,
     checkOutRaw: string,
     guests?: number,
-  ): Promise<Array<{ room: Room; availableUnits: number }>> {
+  ): Promise<
+    Array<{ room: Room; availableUnits: number; totalPrice: number }>
+  > {
     const stay = parseStay(checkInRaw, checkOutRaw);
     const rooms = await this.roomsService.findAvailable({ guests });
     const held = await this.countHeldByRoom(
@@ -130,6 +139,12 @@ export class BookingService {
       availableUnits: Math.max(
         0,
         room.totalUnits - (held.get(String(room._id)) ?? 0),
+      ),
+      totalPrice: priceNights(
+        room.pricePerNight,
+        room,
+        stay.checkIn,
+        stay.nights,
       ),
     }));
   }
@@ -183,6 +198,29 @@ export class BookingService {
     booking.status = 'cancelled';
     await booking.save();
     return booking;
+  }
+
+  // Staff accepting a request. Only a pending booking can be accepted: a
+  // cancelled one has already released its room, which may since have been
+  // taken, so reviving it could overbook.
+  async confirm(id: string, actor: AuthUser): Promise<Booking> {
+    const booking = await this.findOne(id, actor);
+
+    if (booking.status !== 'pending') {
+      throw new BadRequestException(
+        `Only a pending booking can be accepted; this one is ${booking.status}`,
+      );
+    }
+
+    booking.status = 'confirmed';
+    await booking.save();
+    return booking;
+  }
+
+  // Feeds the dashboard's "new requests" badge, polled often — a count is
+  // all it needs, not the bookings themselves.
+  async countPending(): Promise<number> {
+    return this.bookingModel.countDocuments({ status: 'pending' });
   }
 
   // Ownership lives on the booking, not in RolesGuard: "is this yours" needs

@@ -25,12 +25,13 @@ describe('AvailabilityController', () => {
     ).toBeUndefined();
   });
 
-  it('shapes each result as a room plus its free units', async () => {
+  it('shapes each result as a room plus its free units and stay price', async () => {
     const _id = new Types.ObjectId();
     service.findAvailableRooms.mockResolvedValue([
       {
         room: { _id, name: 'Deluxe Double', amenities: [], images: [] },
         availableUnits: 2,
+        totalPrice: 278,
       },
     ]);
 
@@ -49,6 +50,7 @@ describe('AvailabilityController', () => {
       id: String(_id),
       name: 'Deluxe Double',
       availableUnits: 2,
+      totalPrice: 278,
     });
   });
 });

@@ -49,6 +49,15 @@ export class BookingController {
     return bookings.map((b) => new BookingResponseDto(b));
   }
 
+  // Admin-only, for the dashboard badge. Above @Get(':id') for the same
+  // reason as 'me'.
+  @Get('pending-count')
+  @UseGuards(RolesGuard)
+  @Roles('admin')
+  async countPending() {
+    return { count: await this.bookingService.countPending() };
+  }
+
   @Get(':id')
   async findOne(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     const booking = await this.bookingService.findOne(id, user);
@@ -58,6 +67,15 @@ export class BookingController {
   @Patch(':id/cancel')
   async cancel(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     const booking = await this.bookingService.cancel(id, user);
+    return new BookingResponseDto(booking);
+  }
+
+  // Admin-only: accept a guest's request, pending -> confirmed.
+  @Patch(':id/confirm')
+  @UseGuards(RolesGuard)
+  @Roles('admin')
+  async confirm(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    const booking = await this.bookingService.confirm(id, user);
     return new BookingResponseDto(booking);
   }
 }

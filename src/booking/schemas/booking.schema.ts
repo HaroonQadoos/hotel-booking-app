@@ -1,9 +1,9 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 
-// pending: created, awaiting payment (no payment step exists yet — every new
-//          booking sits here until one is added).
-// confirmed: paid. Reserved for the payment flow; nothing sets it today.
+// pending: a guest's request, waiting for staff to accept it.
+// confirmed: accepted by staff (PATCH /bookings/:id/confirm). A payment step,
+//            once one exists, will sit in front of this too.
 // cancelled: released. The only status that frees the room.
 export const BOOKING_STATUSES = ['pending', 'confirmed', 'cancelled'] as const;
 export type BookingStatus = (typeof BOOKING_STATUSES)[number];

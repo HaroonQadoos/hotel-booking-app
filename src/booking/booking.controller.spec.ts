@@ -39,6 +39,14 @@ describe('BookingController', () => {
     expect(metadataOf<unknown[]>(GUARDS_METADATA, 'findAll')).toHaveLength(1);
   });
 
+  it.each(['confirm', 'countPending'] as const)(
+    'restricts %s to admins',
+    (name) => {
+      expect(metadataOf<string[]>(ROLES_KEY, name)).toEqual(['admin']);
+      expect(metadataOf<unknown[]>(GUARDS_METADATA, name)).toHaveLength(1);
+    },
+  );
+
   it.each(['create', 'findMine', 'findOne', 'cancel'] as const)(
     'leaves %s open to any signed-in user',
     (name) => {

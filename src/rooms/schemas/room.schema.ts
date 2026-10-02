@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
+import { DATE_ONLY, MAX_DISCOUNT_PERCENT } from '../../common/discount';
 
 // A Room is a room *type* the hotel sells — "Deluxe Double" — not one physical
 // door. totalUnits says how many identical ones exist; availability for a date
@@ -41,6 +42,19 @@ export class Room extends Document {
 
   @Prop({ type: [String], default: [] })
   images!: string[];
+
+  // A sale: 0 means none. The window bounds are inclusive "YYYY-MM-DD" dates,
+  // null for open-ended. Stored as strings, not Dates, because they are
+  // calendar days the admin typed, and they go back out exactly as typed.
+  // See common/discount.ts for how they are applied.
+  @Prop({ default: 0, min: 0, max: MAX_DISCOUNT_PERCENT })
+  discountPercent!: number;
+
+  @Prop({ type: String, default: null, match: DATE_ONLY })
+  discountStartsAt!: string | null;
+
+  @Prop({ type: String, default: null, match: DATE_ONLY })
+  discountEndsAt!: string | null;
 
   // Removing a room type is a soft delete: bookings reference it, and a hard
   // delete would leave them pointing at nothing. Inactive types are hidden

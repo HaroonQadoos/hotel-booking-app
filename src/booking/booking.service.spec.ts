@@ -179,6 +179,24 @@ describe('BookingService', () => {
       expect(model.deleteOne).toHaveBeenCalledWith({ _id: created._id });
     });
 
+    // IN..OUT is the nights of the 10th, 11th and 12th; the sale ends on the
+    // 11th, so two nights are discounted and one is not.
+    it('discounts only the nights inside the sale window', async () => {
+      rooms.findOne.mockResolvedValue(
+        makeRoom({
+          discountPercent: 20,
+          discountStartsAt: null,
+          discountEndsAt: `${year}-06-11`,
+        }),
+      );
+
+      await service.create(USER_ID, dto);
+
+      expect(model.create).toHaveBeenCalledWith(
+        expect.objectContaining({ totalPrice: 80 + 80 + 100 }),
+      );
+    });
+
     it('rejects more guests than the room sleeps', async () => {
       await expect(
         service.create(USER_ID, { ...dto, guests: 3 }),
@@ -226,6 +244,22 @@ describe('BookingService', () => {
 
       expect(rooms.findAvailable).toHaveBeenCalledWith({ guests: 2 });
       expect(result.map((r) => r.availableUnits)).toEqual([2, 0, 2]);
+    });
+
+    it('prices the searched stay per room, discount included', async () => {
+      const full = makeRoom({ _id: new Types.ObjectId() });
+      const onSale = makeRoom({
+        _id: new Types.ObjectId(),
+        discountPercent: 50,
+        discountStartsAt: IN,
+        discountEndsAt: OUT,
+      });
+      rooms.findAvailable.mockResolvedValue([full, onSale]);
+      model.aggregate.mockResolvedValue([]);
+
+      const result = await service.findAvailableRooms(IN, OUT);
+
+      expect(result.map((r) => r.totalPrice)).toEqual([300, 150]);
     });
 
     it('asks the aggregation for exactly the overlapping holds', async () => {
@@ -348,6 +382,46 @@ describe('BookingService', () => {
       await service.cancel('id', admin);
 
       expect(booking.status).toBe('cancelled');
+    });
+  });
+
+  describe('confirm', () => {
+    function stubFind(booking: FakeBooking) {
+      const exec = jest.fn().mockResolvedValue(booking);
+      model.findById.mockReturnValue({ populate: () => ({ exec }) });
+    }
+
+    it('marks a pending booking confirmed and saves it', async () => {
+      const booking = makeBooking();
+      stubFind(booking);
+
+      await service.confirm('id', admin);
+
+      expect(booking.status).toBe('confirmed');
+      expect(booking.save).toHaveBeenCalledTimes(1);
+    });
+
+    // A cancelled booking released its room, which may since have been sold.
+    it.each(['confirmed', 'cancelled'])(
+      'rejects accepting a %s booking',
+      async (status) => {
+        const booking = makeBooking({ status });
+        stubFind(booking);
+
+        await expect(service.confirm('id', admin)).rejects.toThrow(
+          'Only a pending booking can be accepted',
+        );
+        expect(booking.save).not.toHaveBeenCalled();
+      },
+    );
+  });
+
+  describe('countPending', () => {
+    it('counts pending bookings only', async () => {
+      model.countDocuments.mockResolvedValue(4);
+
+      await expect(service.countPending()).resolves.toBe(4);
+      expect(model.countDocuments).toHaveBeenCalledWith({ status: 'pending' });
     });
   });
 });

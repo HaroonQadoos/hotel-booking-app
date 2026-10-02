@@ -17,6 +17,8 @@ export class AvailabilityController {
       query.checkOut,
       query.guests,
     );
-    return results.map((r) => new AvailableRoomDto(r.room, r.availableUnits));
+    return results.map(
+      (r) => new AvailableRoomDto(r.room, r.availableUnits, r.totalPrice),
+    );
   }
 }

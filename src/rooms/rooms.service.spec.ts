@@ -1,6 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { RoomsService } from './rooms.service';
 import { Room } from './schemas/room.schema';
 import { CreateRoomDto } from './dto/create-room.dto';
@@ -168,6 +172,52 @@ describe('RoomsService', () => {
       await expect(
         service.update('nope', { capacity: 2 }),
       ).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('update: discount window', () => {
+    // The DTO sees only the payload; a lone bound is checked against the
+    // stored one.
+    it('rejects moving the end before the stored start', async () => {
+      model.findById.mockResolvedValue({
+        _id: 'r1',
+        discountStartsAt: '2026-12-20',
+        discountEndsAt: null,
+      });
+
+      await expect(
+        service.update('r1', { discountEndsAt: '2026-12-01' }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(model.findByIdAndUpdate).not.toHaveBeenCalled();
+    });
+
+    it('accepts a lone bound that fits the stored one', async () => {
+      model.findById.mockResolvedValue({
+        _id: 'r1',
+        discountStartsAt: '2026-12-20',
+        discountEndsAt: null,
+      });
+      model.findByIdAndUpdate.mockResolvedValue({ _id: 'r1' });
+
+      await service.update('r1', { discountEndsAt: '2026-12-31' });
+
+      expect(model.findByIdAndUpdate).toHaveBeenCalledWith(
+        'r1',
+        { discountEndsAt: '2026-12-31' },
+        { new: true, runValidators: true },
+      );
+    });
+
+    // Both bounds in one payload are the DTO's job; no extra read needed.
+    it('does not re-read when both bounds are sent', async () => {
+      model.findByIdAndUpdate.mockResolvedValue({ _id: 'r1' });
+
+      await service.update('r1', {
+        discountStartsAt: null,
+        discountEndsAt: null,
+      });
+
+      expect(model.findById).not.toHaveBeenCalled();
     });
   });
 

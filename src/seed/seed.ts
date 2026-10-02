@@ -5,10 +5,12 @@ import { Model } from 'mongoose';
 import { AppModule } from '../app.module';
 import { ensureUsableDnsServers } from '../ensure-dns';
 import { Room } from '../rooms/schemas/room.schema';
+import { Venue } from '../venues/schemas/venue.schema';
 import { ROOM_SEED } from './rooms.seed';
+import { VENUE_SEED } from './venues.seed';
 
 // Idempotent: upserts by name, so running it twice leaves one row per room
-// type with the latest seed values. Safe on a database that already has data.
+// type (and venue) with the latest seed values. Safe on a database that already has data.
 async function seed() {
   ensureUsableDnsServers();
   const logger = new Logger('Seed');
@@ -29,6 +31,16 @@ async function seed() {
       );
     }
     logger.log(`Seeded ${ROOM_SEED.length} room types`);
+
+    const venueModel = app.get<Model<Venue>>(getModelToken(Venue.name));
+    for (const venue of VENUE_SEED) {
+      await venueModel.updateOne(
+        { name: venue.name },
+        { $set: venue },
+        { upsert: true, runValidators: true },
+      );
+    }
+    logger.log(`Seeded ${VENUE_SEED.length} venues`);
   } finally {
     await app.close();
   }

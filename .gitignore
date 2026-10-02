@@ -3,6 +3,9 @@
 /node_modules
 /build
 
+# Photos uploaded from the dashboard
+/uploads
+
 # Logs
 logs
 *.log

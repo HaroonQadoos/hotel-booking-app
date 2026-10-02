@@ -1,10 +1,12 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, QueryFilter } from 'mongoose';
+import { isValidDiscountWindow } from '../common/discount';
 import { Room } from './schemas/room.schema';
 import { CreateRoomDto } from './dto/create-room.dto';
 import { UpdateRoomDto } from './dto/update-room.dto';
@@ -55,6 +57,7 @@ export class RoomsService {
         );
       }
     }
+    await this.assertDiscountWindow(id, dto);
     // runValidators: findByIdAndUpdate skips schema validation by default, so
     // without it an update could write a price of -5 past the min: 0 rule.
     const room = await this.roomModel.findByIdAndUpdate(id, dto, {
@@ -63,6 +66,27 @@ export class RoomsService {
     });
     if (!room) throw new NotFoundException('Room not found');
     return room;
+  }
+
+  // The DTO checks the window when both bounds arrive together. A PATCH that
+  // moves only one bound has to be checked against the stored other one.
+  private async assertDiscountWindow(
+    id: string,
+    dto: UpdateRoomDto,
+  ): Promise<void> {
+    const sentStart = dto.discountStartsAt !== undefined;
+    const sentEnd = dto.discountEndsAt !== undefined;
+    if (sentStart === sentEnd) return;
+    const current = await this.findOne(id);
+    const startsAt = sentStart
+      ? dto.discountStartsAt
+      : current.discountStartsAt;
+    const endsAt = sentEnd ? dto.discountEndsAt : current.discountEndsAt;
+    if (!isValidDiscountWindow(startsAt, endsAt)) {
+      throw new BadRequestException(
+        'discountEndsAt must be on or after discountStartsAt',
+      );
+    }
   }
 
   // Soft delete — see the note on Room.isActive. The document stays so that
