@@ -10,6 +10,7 @@ import { MailModule } from './mail/mail.module';
 import { RoomsModule } from './rooms/rooms.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { VenuesModule } from './venues/venues.module';
+import { LocationModule } from './location/location.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { VenuesModule } from './venues/venues.module';
     RoomsModule,
     UploadsModule,
     VenuesModule,
+    LocationModule,
   ],
   controllers: [AppController],
   providers: [AppService],
